@@ -18,6 +18,7 @@ dfForPlotly <- function(dataList,dats,selection)
   library(tidyr)
   dfs_selection <- lapply(dataList,function(t){
     dum <- dats[[t]][1+c(0,selection),]
+    dum[[1]] <- as.character(dum[[1]])
     dum[1,1] <- "ID"
     colnames(dum) <- dum[1,]
     dum <- dum[-1,]

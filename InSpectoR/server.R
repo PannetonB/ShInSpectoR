@@ -104,7 +104,7 @@ shinyServer(function(input, output, session) {
                             color=ptColor,
                             colors = mycolors,
                             size=8,
-                            text=as.character(Ys_df[,'ID']),
+                            text=as.character(Ys_df[[1]]),
                             hovertext=as.character(Ys_df[,input$pcaPtColorBy]),
                             hovertemplate = paste('EchID: %{text}')) %>%
                 add_markers(data=dfsPCA_sel,
@@ -430,7 +430,8 @@ shinyServer(function(input, output, session) {
                        xall <- isolate(as.numeric(dfsPCA[input$pc1][,1]))
                        yall <-isolate( as.numeric(dfsPCA[input$pc2][,1]))
                        laRow <- (myNearPoint(d$x,d$y,xall,yall))
-                       proxy_Ys %>% selectRows(laRow)
+                       choisie <- input$Ys_rows_selected
+                       proxy_Ys %>% selectRows(c(choisie,laRow))
                  },
                  ignoreInit = T
                  )
