@@ -20,6 +20,7 @@ shinyServer(function(input, output, session) {
     PPvaluesPerSpectra <- reactiveValues(dfWorking = data.frame())
     PPvaluesSavgol <- reactiveValues(dfWorking = data.frame())
     
+    
     output$Ys <- renderDataTable({
         Yvalues$dfWorking
     })
@@ -155,7 +156,7 @@ shinyServer(function(input, output, session) {
             colPC2 <- which(colnames(lePCA$x)==input$pc2)
             ys1 <- lePCA$rotation[,colPC1]  #First PC loadings
             ys2 <-lePCA$rotation[,colPC2]  #Second PC loadings
-            xs <- as.numeric(All_XData[[whichData]][1,-1])
+            xs <- as.numeric(All_XData_p[[whichData]][1,-1])
             plotdf <- data.frame(Wavelength=xs, Loadings1=ys1,Loadings2=ys2)
             p1 <- plot_ly(plotdf, x = ~Wavelength, y = ~Loadings1 ,type='scatter',mode="line" ) %>%
                 layout(title = input$PCA_data,
@@ -186,7 +187,7 @@ shinyServer(function(input, output, session) {
         indi <- which(stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
         Ys_df <<- read.table(file=inFile$datapath[indi],header=TRUE,sep="\t",dec=".",
                              na.strings = "", stringsAsFactors = T)
-        Ys_df[,1] <- as.factor(Ys_df[,1])
+        Ys_df[,1] <- as.factor(make.unique(as.character(Ys_df[,1])))
         Ys_df <<- cbind(Ys_df,data.frame(NoSeq=seq(1:nrow(Ys_df))))
         ORI_Ys_df <<- Ys_df
         #load all XData in All_XData
@@ -195,6 +196,7 @@ shinyServer(function(input, output, session) {
         for (ii in 1:length(indi)){
             if (indi[ii]){
                 dum1<-read.table(file=inFile$datapath[ii],sep="\t", dec=".",header=FALSE)
+                dum1[-1,1] <- make.unique(as.character(dum1[-1,1]))
                 test1 <- length(dum1[-1,1])==length(Ys_df[,1])
                 test2 <- TRUE
                 if (test1) test2 <- any(as.character(dum1[-1,1])!=as.character(Ys_df[,1]))
@@ -210,29 +212,29 @@ shinyServer(function(input, output, session) {
                 }else
                 {
                     All_XData[[inFile$name[ii]]] <<- dum1
-                    #normalize matrices by closure by default for PCA
-                    dats <- dum1[-1,-1]
-                    L <- ncol(dats)
-                    dats <- t(apply(dats,1,function(z) z*L/sum(z))) 
-                    #Compute PCA on normalized spectra
-                    nCP <- input$npcs #hard limit to 15 CPs
-                    pcdum <- prcomp(dats, rank=nCP)
-                    #Compute in-model and perpendicular distances
-                    pca2<-pr_2_prin(pcdum)
-                    dd <- chemometrics::pcaDiagplot(dats,pca2,a=nCP,
-                                                    plot=FALSE,scale=FALSE)
-                    PCAs_dds[[inFile$name[ii]]] <<- cbind(dd$SDist,dd$ODist)
-                    PCAs_dds_crit[[inFile$name[ii]]] <<- c(dd$critSD,dd$critOD)
-                    
-                    #Finalise PCA scores matrix
-                    rownames(pcdum$x) <- dum1[-1,1]
-                    #Add SDist and ODist columns
-                    pcdum$x <- cbind(pcdum$x,dd$SDist,dd$ODist)
-                    colnames(pcdum$x) <- c(paste0("PC",1:nCP),
-                                           "SDist","ODist")
-                    rownames(pcdum$rotation) <- dum1[1,-1]
-                    colnames(pcdum$rotation) <- dum1[-1,1][1:nCP]
-                    PCAs[[inFile$name[ii]]] <<- pcdum
+                    # #normalize matrices by closure by default for PCA
+                    # dats <- dum1[-1,-1]
+                    # L <- ncol(dats)
+                    # dats <- t(apply(dats,1,function(z) z*L/sum(z))) 
+                    # #Compute PCA on normalized spectra
+                    # nCP <- input$npcs #hard limit to 15 CPs
+                    # pcdum <- prcomp(dats, rank=nCP)
+                    # #Compute in-model and perpendicular distances
+                    # pca2<-pr_2_prin(pcdum)
+                    # dd <- chemometrics::pcaDiagplot(dats,pca2,a=nCP,
+                    #                                 plot=FALSE,scale=FALSE)
+                    # PCAs_dds[[inFile$name[ii]]] <<- cbind(dd$SDist,dd$ODist)
+                    # PCAs_dds_crit[[inFile$name[ii]]] <<- c(dd$critSD,dd$critOD)
+                    # 
+                    # #Finalise PCA scores matrix
+                    # rownames(pcdum$x) <- dum1[-1,1]
+                    # #Add SDist and ODist columns
+                    # pcdum$x <- cbind(pcdum$x,dd$SDist,dd$ODist)
+                    # colnames(pcdum$x) <- c(paste0("PC",1:nCP),
+                    #                        "SDist","ODist")
+                    # rownames(pcdum$rotation) <- dum1[1,-1]
+                    # colnames(pcdum$rotation) <- dum1[-1,1][1:nCP]
+                    # PCAs[[inFile$name[ii]]] <<- pcdum
                 }
             }
         }
@@ -240,14 +242,75 @@ shinyServer(function(input, output, session) {
         
         #By default, remove Rayleigh and do norm by closure for fluorescence
         #for data visualisation
-        # for (jj in 1:length(All_XData))
-        # dats <- dum1[-1,-1]
-        # #First find cutoff for Rayleigh
-        # #Find excitation wavelength
-        # leNom <- inFile$name[ii]
-        # # Check if this is fluorescence
-        # isFluo <- substr(leNom,1,2)=="EX"
-        All_XData_p <<- All_XData
+        for (jj in 1:length(All_XData)){
+          dats <- All_XData[[jj]]
+          #First find cutoff for Rayleigh
+          #Find excitation wavelength
+          leNom <- inFile$name[indi[[jj]]]
+          # Check if this is fluorescence
+          isFluo <- substr(leNom,1,2)=="EX"
+          if (isFluo){
+            #Find excitation wavelength
+            EXwv <- strsplit(leNom,"_")[[1]][1]
+            #ATTN - marche si longueur d'onde d'excitation a 3 chiffres.
+            EXwv <- as.numeric(substr(EXwv,start=3,stop=5))
+            #Find local min between EXwv and EXwv+50
+            #First do some smoothing
+            
+            #Isolate data
+            ind1 <- dats[1,-1] >=EXwv
+            ind2 <- dats[1,-1] <= (EXwv+50)
+            myarray <- dats[-1,c(FALSE,(ind1 & ind2))]
+            
+            #Smooth per line
+            myarray <- apply(myarray,2,function(x) smooth.spline(x)$y)
+            infl <- apply(myarray,2,function(x) c(FALSE,diff(diff(x)>0)!=0))
+            
+            #Find inflection points (1rst derivative changes sign)
+            wvDips <- apply(infl,1, function(x) (EXwv:(EXwv+50))[which(x)[1]])
+            
+            #Find average location of dip for all samples.
+            wvDip <- round(quantile(wvDips,probs=0.9,na.rm=T))
+            
+            #Truncation
+            inTrunc <- dats[1,-1]>wvDip
+            dum <- All_XData[[jj]][,c(TRUE,inTrunc)]
+            
+            #normalize matrices by closure by default for PCA
+            dats <- dum[-1,-1]
+            L <- ncol(dats)
+            dats <- t(apply(dats,1,function(z) z*L/sum(z)))
+            dum[-1,-1] <- dats
+            All_XData_p[[leNom]] <<-dum  
+            
+            #dats <- dum[-1,-1]
+            L <- ncol(dats)
+            dats <- t(apply(dats,1,function(z) z*L/sum(z))) 
+            #Compute PCA on normalized spectra
+            nCP <- input$npcs #hard limit to 15 CPs
+            pcdum <- prcomp(dats, rank=nCP)
+            #Compute in-model and perpendicular distances
+            pca2<-pr_2_prin(pcdum)
+            dd <- chemometrics::pcaDiagplot(dats,pca2,a=nCP,
+                                            plot=FALSE,scale=FALSE)
+            PCAs_dds[[leNom]] <<- cbind(dd$SDist,dd$ODist)
+            PCAs_dds_crit[[leNom]] <<- c(dd$critSD,dd$critOD)
+            
+            #Finalise PCA scores matrix
+            rownames(pcdum$x) <- dum1[-1,1]
+            #Add SDist and ODist columns
+            pcdum$x <- cbind(pcdum$x,dd$SDist,dd$ODist)
+            colnames(pcdum$x) <- c(paste0("PC",1:nCP),
+                                   "SDist","ODist")
+            rownames(pcdum$rotation) <- dum[1,-1]
+            colnames(pcdum$rotation) <- dum[-1,1][1:nCP]
+            PCAs[[leNom]] <<- pcdum
+          }
+          else{
+            All_XData_p[[leNom]] <<- All_XData[[leNom]]
+          }
+        }
+        #All_XData_p <<- All_XData
         #Populate Xs file selection and select first by default
         updateSelectInput(session, "Xs",               
                           choices=inFile$name[indi],
@@ -270,13 +333,14 @@ shinyServer(function(input, output, session) {
         
         
         #Table of Ys
-        dtable <- DT::datatable(Ys_df, width = 300,
+        dtable <- DT::datatable(Ys_df, width = '900px',
                                 options=list(
                                     lengthMenu = list(c(10, 15, 20, -1), c('10', '15', '20','All')),
-                                    pageLength = 20,
+                                    pageLength = 10,
                                     scrollX = TRUE,
                                     columnDefs = list(list(orderable = TRUE, targets = 0))
-                                ))
+                                ),
+                                filter='top')
         dtable$x$data[[1]] <- as.numeric(dtable$x$data[[1]])-1
         #Force name of column for sample ID to ID
         colnames(dtable$x$data)[2] <- "ID"  #by default row number (0 based) on
@@ -293,7 +357,7 @@ shinyServer(function(input, output, session) {
             HigherLimit = max(All_XData[[1]][1,-1])
         )
         
-        dtable <- datatable(truncDF,rownames = F, width=300,
+        dtable <- datatable(truncDF,rownames = F, width='300px',
                             options = list(dom = 't',
                                            scrollX=TRUE)
         )
@@ -344,6 +408,8 @@ shinyServer(function(input, output, session) {
     
     observe({
         XDataList <<- input$Xs
+        
+        proxy_Ys %>% selectRows(NULL)
     })
     
     observeEvent(input$clearRows, {
@@ -393,7 +459,7 @@ shinyServer(function(input, output, session) {
     
     observeEvent(input$restoreOriData, {
         Ys_df <<- ORI_Ys_df
-        dtable <- DT::datatable(Ys_df, width = 300,
+        dtable <- DT::datatable(Ys_df, width = '900px',
                                 options=list(
                                     lengthMenu = list(c(10, 15, 20, -1), c('10', '15', '20','All')),
                                     pageLength = 20,

@@ -71,7 +71,10 @@ shinyUI(fluidPage(
                                    actionButton("deleteRows", "Delete Selected Rows"),
                                    actionButton("restoreOriData", "Restore data set"),
                                    hr(style = "border-top: 1px solid #FFFFFF;"),
-                                   DT::dataTableOutput('Ys')
+                                   fluidRow(DT::dataTableOutput('Ys',
+                                                                height='auto',
+                                                                width='900px')
+                                            )
                                    ),
                             column(6, offset=2, 
                                    fluidRow(plotlyOutput("spectraPlots", 
@@ -96,7 +99,7 @@ shinyUI(fluidPage(
                ),
                tabPanel("Preprocessing",
                         h3("TRUNCATION"),
-                        DT::dataTableOutput("PreProsTrunc", width = 350),
+                        DT::dataTableOutput("PreProsTrunc", width = '350px'),
                         h3("PER SPECTRUM NORMALIZATION"),
                         DT::dataTableOutput('PreProsPerSpectra'),
                         h3("SAVITZKY-GOLAY"),
