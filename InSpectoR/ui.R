@@ -75,11 +75,11 @@ shinyUI(fluidPage(
                                    ),
                             column(6, offset=2, 
                                    fluidRow(plotlyOutput("spectraPlots", 
-                                                       height="450px",
+                                                       height="400px",
                                                        width="auto")
                                             ),
                                    fluidRow(plotlyOutput("acpPlots",
-                                                            height="550px",
+                                                            height="400px",
                                                             width="auto")
                                             )
                                 

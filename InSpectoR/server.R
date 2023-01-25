@@ -65,7 +65,8 @@ shinyServer(function(input, output, session) {
                                  type = 'scatter', mode = 'lines',
                                  linetype = ~DType, 
                                  name=~names) %>%
-                layout(legend=list(title=list(text='<b>Type de donnéesÉchantillon - Échantillon</b>'),
+                layout(showlegend=T,
+                       legend=list(title=list(text='<b>Type de donnéesÉchantillon - Échantillon</b>'),
                     #  x=0.75, y=0.98),
                        xaxis = list(title = 'Wavelength [nm] or Wavenumber[cm<sup>-1</sup>]'), 
                        yaxis = list(title = 'Spectra [A.U.]')))
@@ -209,8 +210,8 @@ shinyServer(function(input, output, session) {
                 }else
                 {
                     All_XData[[inFile$name[ii]]] <<- dum1
+                    #normalize matrices by closure by default for PCA
                     dats <- dum1[-1,-1]
-                    #normalize matrices by closure by default
                     L <- ncol(dats)
                     dats <- t(apply(dats,1,function(z) z*L/sum(z))) 
                     #Compute PCA on normalized spectra
@@ -236,6 +237,16 @@ shinyServer(function(input, output, session) {
             }
         }
         ORI_XData <<- All_XData
+        
+        #By default, remove Rayleigh and do norm by closure for fluorescence
+        #for data visualisation
+        # for (jj in 1:length(All_XData))
+        # dats <- dum1[-1,-1]
+        # #First find cutoff for Rayleigh
+        # #Find excitation wavelength
+        # leNom <- inFile$name[ii]
+        # # Check if this is fluorescence
+        # isFluo <- substr(leNom,1,2)=="EX"
         All_XData_p <<- All_XData
         #Populate Xs file selection and select first by default
         updateSelectInput(session, "Xs",               
