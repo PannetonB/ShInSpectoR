@@ -335,10 +335,17 @@ shinyServer(function(input, output, session) {
         #Table of Ys
         dtable <- DT::datatable(Ys_df, width = '900px',
                                 options=list(
+                                    autoWidth=FALSE,
                                     lengthMenu = list(c(10, 15, 20, -1), c('10', '15', '20','All')),
                                     pageLength = 10,
                                     scrollX = TRUE,
-                                    columnDefs = list(list(orderable = TRUE, targets = 0))
+                                    columnDefs = list(
+                                      list(orderable = TRUE, targets = 0),
+                                      list(width = '15px', targets = 0),
+                                      list(width = '75px', targets = 1:(ncol(Ys_df)-1)),
+                                      list(className = "dt-center", targets = "_all")
+                                      #columnDefs = list(list(orderable = TRUE, targets = 0)
+                                    )
                                 ),
                                 filter='top')
         dtable$x$data[[1]] <- as.numeric(dtable$x$data[[1]])-1

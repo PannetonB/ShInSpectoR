@@ -17,11 +17,16 @@ library(shinyjqui)
 library(rhandsontable)
 
 # Define UI for application that draws a histogram
+
+
+
 shinyUI(fluidPage(
     useShinyjs(),
     #Darker horizontal line
     tags$head(
-        tags$style(HTML("hr {border-top: 1px solid #000000;}"))
+        tags$style(HTML("hr {border-top: 1px solid #000000;}")),
+        tags$style(HTML("table {table-layout: fixed;}"))    #For setting column widths,
+        
     ),
 
     # Application title
@@ -73,7 +78,8 @@ shinyUI(fluidPage(
                                    hr(style = "border-top: 1px solid #FFFFFF;"),
                                    fluidRow(DT::dataTableOutput('Ys',
                                                                 height='auto',
-                                                                width='900px')
+                                                                width='900px'
+                                                                )
                                             )
                                    ),
                             column(6, offset=2, 
