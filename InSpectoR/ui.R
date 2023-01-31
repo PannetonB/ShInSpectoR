@@ -105,7 +105,7 @@ shinyUI(fluidPage(
                ),
                tabPanel("Preprocessing",
                         h3("TRUNCATION"),
-                        DT::dataTableOutput("PreProsTrunc", width = '350px'),
+                        DT::dataTableOutput("PreProsTrunc", width = '800px'),
                         h3("PER SPECTRUM NORMALIZATION"),
                         DT::dataTableOutput('PreProsPerSpectra'),
                         h3("SAVITZKY-GOLAY"),

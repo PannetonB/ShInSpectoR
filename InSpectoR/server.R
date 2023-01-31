@@ -129,11 +129,13 @@ shinyServer(function(input, output, session) {
                 event_register("plotly_click") %>%
                 event_register("plotly_brushing") %>%
                 event_register("plotly_doubleclick")
+            
             p <- switch(input$pc1,
                    SDist = p %>% layout(shapes = list(vline(PCAs_dds_crit[[lePCA]][1]))),
                    ODist = p %>% layout(shapes = list(vline(PCAs_dds_crit[[lePCA]][2]))),
                    p
             )
+            
             p <- switch(input$pc2,
                     SDist = p %>% layout(shapes = list(hline(PCAs_dds_crit[[lePCA]][1]))),
                     ODist = p %>% layout(shapes = list(hline(PCAs_dds_crit[[lePCA]][2]))),
@@ -177,6 +179,7 @@ shinyServer(function(input, output, session) {
      
     observe({ toggle(id="plotloadings", 
                      condition=all(stringr::str_detect(c(input$pc1,input$pc2),"PC")))})
+    
     
     observeEvent(input$files, {
         k=1
@@ -364,9 +367,11 @@ shinyServer(function(input, output, session) {
             HigherLimit = max(All_XData[[1]][1,-1])
         )
         
-        dtable <- datatable(truncDF,rownames = F, width='300px',
+        dtable <- datatable(truncDF,rownames = F, width='800px',
                             options = list(dom = 't',
-                                           scrollX=TRUE)
+                                           scrollX=TRUE),
+                            editable=TRUE
+                            
         )
         
         
@@ -375,6 +380,13 @@ shinyServer(function(input, output, session) {
         },
         ignoreInit = T
     )
+    
+    observeEvent(input$PreProsTrunc_cell_edit, {
+      print("Bingo")
+      row  <- input$PreProsTrunc_cell_edit$row
+      clmn <- input$PreProsTrunc_cell_edit$col
+      PPvaluesTrunc$dfWorking$x$data[row, clmn] <- input$PreProsTrunc_cell_edit$value
+    })
     
     observeEvent(input$npcs,{
         for (k in 1:length(All_XData_p)){
@@ -416,6 +428,27 @@ shinyServer(function(input, output, session) {
     observe({
         XDataList <<- input$Xs
         
+        #Update prepro tables 
+        #Truncation
+        truncDF <- data.frame(
+          Spectra = XDataList,
+          LowerLimit = unlist(lapply(as.list(XDataList), function(iii)
+                                               min(All_XData[[iii]][1,-1]))),
+          HigherLimit = unlist(lapply(as.list(XDataList), function(iii)
+            max(All_XData[[iii]][1,-1])))
+        )
+        
+        dtable <- datatable(truncDF,rownames = F, width='800px',
+                            options = list(dom = 't',
+                                           scrollX=TRUE),
+                            editable=TRUE
+                            
+        )
+        
+        
+        PPvaluesTrunc$dfWorking <- dtable
+        
+        #Cancel selections in Ys table
         proxy_Ys %>% selectRows(NULL)
     })
     
