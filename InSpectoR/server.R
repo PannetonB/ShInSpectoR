@@ -64,7 +64,7 @@ shinyServer(function(input, output, session) {
                                  linetype = ~DType, 
                                  name=~names) %>%
                 layout(showlegend=T,
-                       legend=list(title=list(text='<b>Type de donnéesÉchantillon - Échantillon</b>'),
+                       legend=list(title=list(text='<b>Data type - Sample ID</b>'),
                     #  x=0.75, y=0.98),
                        xaxis = list(title = 'Wavelength [nm] or Wavenumber[cm<sup>-1</sup>]'), 
                        yaxis = list(title = 'Spectra [A.U.]')))
@@ -85,9 +85,7 @@ shinyServer(function(input, output, session) {
             dfsPCA <- cbind(dfsPCA,Ys_df[input$pcaPtColorBy])
             dfsPCA_unsel <- dfsPCA[-s,]
             dfsPCA_sel <- dfsPCA[s,]
-            
-            # nb.cols <- length(levels(Ys_df[input$pcaPtColorBy][,1]))
-            # mycolors <- colorRampPalette(RColorBrewer::brewer.pal(8, "Set1"))(nb.cols)
+          
             mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
             
             t <- list(
@@ -98,7 +96,7 @@ shinyServer(function(input, output, session) {
             
             p <- plotly::plot_ly(source="pcaPlot"
                                  ) %>%
-                add_markers(data=dfsPCA,
+                add_markers(data=dfsPCA,          #Plot all points
                             x=lepc1, y=lepc2,
                             type = "scatter", mode = "markers",
                             color=ptColor,
@@ -107,7 +105,7 @@ shinyServer(function(input, output, session) {
                             text=as.character(Ys_df[[1]]),
                             hovertext=as.character(Ys_df[,input$pcaPtColorBy]),
                             hovertemplate = paste('EchID: %{text}')) %>%
-                add_markers(data=dfsPCA_sel,
+                add_markers(data=dfsPCA_sel,     #Circle selected in red
                             x=lepc1,y=lepc2,
                             type = "scatter", mode = "markers",
                             hoverinfo='skip',
@@ -118,7 +116,7 @@ shinyServer(function(input, output, session) {
                                 size=12,
                                 line=list(width=2)),
                             showlegend=FALSE) %>%
-                add_text(data=dfsPCA_sel,
+                add_text(data=dfsPCA_sel,           #Place sample ID near selected points
                          x=lepc1,y=lepc2,
                          text = paste0("  ",rownames(dfsPCA_sel)),
                          textfont = t, textposition = "top right",
@@ -128,12 +126,12 @@ shinyServer(function(input, output, session) {
                 event_register("plotly_brushing") %>%
                 event_register("plotly_doubleclick")
             
+            # Add confidence limits for SDist and/or ODist
             p <- switch(input$pc1,
                    SDist = p %>% layout(shapes = list(vline(PCAs_dds_crit[[lePCA]][1]))),
                    ODist = p %>% layout(shapes = list(vline(PCAs_dds_crit[[lePCA]][2]))),
                    p
             )
-            
             p <- switch(input$pc2,
                     SDist = p %>% layout(shapes = list(hline(PCAs_dds_crit[[lePCA]][1]))),
                     ODist = p %>% layout(shapes = list(hline(PCAs_dds_crit[[lePCA]][2]))),
@@ -147,11 +145,11 @@ shinyServer(function(input, output, session) {
             event_register("plotly_selected")
     })
     
+    ## Plot loadings in a modal window ----
     output$loadingPlots <- renderPlotly({
         if (all(stringr::str_detect(c(input$pc1,input$pc2),"PC"))){
             lePCA <- PCAs[[input$PCA_data]]
             whichData <- which(input$PCA_data==names(PCAs))
-            unPCA <<- lePCA
             colPC1 <- which(colnames(lePCA$x)==input$pc1)
             colPC2 <- which(colnames(lePCA$x)==input$pc2)
             ys1 <- lePCA$rotation[,colPC1]  #First PC loadings
@@ -175,6 +173,7 @@ shinyServer(function(input, output, session) {
    
    
     ## Toggles Plot Loadings action button ---- 
+    # Both pc1 and pc2 inputs must be a principal components for button to show
     observe({ toggle(id="plotloadings", 
                      condition=all(stringr::str_detect(c(input$pc1,input$pc2),"PC")))})
     
@@ -189,6 +188,7 @@ shinyServer(function(input, output, session) {
         indi <- which(stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
         Ys_df <<- read.table(file=inFile$datapath[indi],header=TRUE,sep="\t",dec=".",
                              na.strings = "", stringsAsFactors = T)
+        #make.unique to deal with repeated sample ID.
         Ys_df[,1] <- as.factor(make.unique(as.character(Ys_df[,1])))
         Ys_df <<- cbind(Ys_df,data.frame(NoSeq=seq(1:nrow(Ys_df))))
         ORI_Ys_df <<- Ys_df
@@ -214,38 +214,21 @@ shinyServer(function(input, output, session) {
                 }else
                 {
                     All_XData[[inFile$name[ii]]] <<- dum1
-                    # #normalize matrices by closure by default for PCA
-                    # dats <- dum1[-1,-1]
-                    # L <- ncol(dats)
-                    # dats <- t(apply(dats,1,function(z) z*L/sum(z))) 
-                    # #Compute PCA on normalized spectra
-                    # nCP <- input$npcs #hard limit to 15 CPs
-                    # pcdum <- prcomp(dats, rank=nCP)
-                    # #Compute in-model and perpendicular distances
-                    # pca2<-pr_2_prin(pcdum)
-                    # dd <- chemometrics::pcaDiagplot(dats,pca2,a=nCP,
-                    #                                 plot=FALSE,scale=FALSE)
-                    # PCAs_dds[[inFile$name[ii]]] <<- cbind(dd$SDist,dd$ODist)
-                    # PCAs_dds_crit[[inFile$name[ii]]] <<- c(dd$critSD,dd$critOD)
-                    # 
-                    # #Finalise PCA scores matrix
-                    # rownames(pcdum$x) <- dum1[-1,1]
-                    # #Add SDist and ODist columns
-                    # pcdum$x <- cbind(pcdum$x,dd$SDist,dd$ODist)
-                    # colnames(pcdum$x) <- c(paste0("PC",1:nCP),
-                    #                        "SDist","ODist")
-                    # rownames(pcdum$rotation) <- dum1[1,-1]
-                    # colnames(pcdum$rotation) <- dum1[-1,1][1:nCP]
-                    # PCAs[[inFile$name[ii]]] <<- pcdum
                 }
             }
         }
         ORI_XData <<- All_XData
         
+        #Sets max nb of pcs to 15 or the number of samples-1 if smaller
+        nSamples <- nrow(All_XData[[1]])-1
+        maxnCP <- ifelse (nSamples < 21, nSamples-1, 20 )
+        updateSliderInput(session,"npcs",max=maxnCP,value=5)
+        
         #By default, remove Rayleigh and do norm by closure for fluorescence
         #for data visualisation
         for (jj in 1:length(All_XData)){
           dats <- All_XData[[jj]]
+          
           #First find cutoff for Rayleigh
           #Find excitation wavelength
           leNom <- inFile$name[indi[[jj]]]
@@ -256,21 +239,18 @@ shinyServer(function(input, output, session) {
             EXwv <- strsplit(leNom,"_")[[1]][1]
             #ATTN - marche si longueur d'onde d'excitation a 3 chiffres.
             EXwv <- as.numeric(substr(EXwv,start=3,stop=5))
+            
             #Find local min between EXwv and EXwv+50
             #First do some smoothing
-            
             #Isolate data
             ind1 <- dats[1,-1] >=EXwv
             ind2 <- dats[1,-1] <= (EXwv+50)
             myarray <- dats[-1,c(FALSE,(ind1 & ind2))]
-            
             #Smooth per line
             myarray <- apply(myarray,2,function(x) smooth.spline(x)$y)
             infl <- apply(myarray,2,function(x) c(FALSE,diff(diff(x)>0)!=0))
-            
             #Find inflection points (1rst derivative changes sign)
             wvDips <- apply(infl,1, function(x) (EXwv:(EXwv+50))[which(x)[1]])
-            
             #Find average location of dip for all samples.
             wvDip <- round(quantile(wvDips,probs=0.9,na.rm=T))
             #If wvDip too close to EXwv, default do EXwv + 25
@@ -280,57 +260,46 @@ shinyServer(function(input, output, session) {
             inTrunc <- dats[1,-1]>wvDip
             dum <- All_XData[[jj]][,c(TRUE,inTrunc)]
             
-            #normalize matrices by closure by default for PCA
+            #normalize matrices by closure by default for fluorescence
             dats <- dum[-1,-1]
             L <- ncol(dats)
             dats <- t(apply(dats,1,function(z) z*L/sum(z)))
             dum[-1,-1] <- dats
             All_XData_p[[leNom]] <<-dum  
             
-            #dats <- dum[-1,-1]
-            L <- ncol(dats)
-            dats <- t(apply(dats,1,function(z) z*L/sum(z))) 
-            #Compute PCA on normalized spectra
-            nCP <- input$npcs #hard limit to 15 CPs
-            pcdum <- prcomp(dats, rank=nCP)
-            #Compute in-model and perpendicular distances
-            pca2<-pr_2_prin(pcdum)
-            dd <- chemometrics::pcaDiagplot(dats,pca2,a=nCP,
-                                            plot=FALSE,scale=FALSE)
-            PCAs_dds[[leNom]] <<- cbind(dd$SDist,dd$ODist)
-            PCAs_dds_crit[[leNom]] <<- c(dd$critSD,dd$critOD)
-            
-            #Finalise PCA scores matrix
-            rownames(pcdum$x) <- dum1[-1,1]
-            #Add SDist and ODist columns
-            pcdum$x <- cbind(pcdum$x,dd$SDist,dd$ODist)
-            colnames(pcdum$x) <- c(paste0("PC",1:nCP),
-                                   "SDist","ODist")
-            rownames(pcdum$rotation) <- dum[1,-1]
-            colnames(pcdum$rotation) <- dum[-1,1][1:nCP]
-            PCAs[[leNom]] <<- pcdum
+            # #Compute PCA on normalized spectra
+            lesChoix <- computePCA(input$npcs, dum, leNom)
           }
           else{
-            All_XData_p[[leNom]] <<- All_XData[[leNom]]
+            #normalize matrices by closure by default
+            dum <- All_XData[[leNom]]
+            dats <- dum[-1,-1]
+            L <- ncol(dats)
+            dats <- t(apply(dats,1,function(z) z*L/sum(z)))
+            dum[-1,-1] <- dats
+            All_XData_p[[leNom]] <<-dum 
+            # #Compute PCA on normalized spectra
+            lesChoix <- computePCA(input$npcs, dum, leNom)
           }
         }
-        #All_XData_p <<- All_XData
+        
         #Populate Xs file selection and select first by default
         updateSelectInput(session, "Xs",               
                           choices=inFile$name[indi],
                           selected=inFile$name[indi][1])
         ALLXDataList <<- inFile$name[indi]
+        
         #Populate PCA data selection
         updateSelectInput(session,"PCA_data",
                           choices=inFile$name[indi],
                           selected=inFile$name[indi][1])
+        
         #Populate select CPs to plot
-        leschoix <- colnames(pcdum$x)
         updateSelectInput(session,"pc1",
-                          choices = leschoix,
+                          choices = lesChoix,
                           selected="SDist")
         updateSelectInput(session,"pc2",
-                          choices = leschoix,
+                          choices = lesChoix,
                           selected="ODist")
         updateSelectInput(session,"pcaPtColorBy",
                           choices=names(Filter(is.factor,Ys_df))[-1])
@@ -364,8 +333,8 @@ shinyServer(function(input, output, session) {
         #Truncation
         truncDF <- data.frame(
             Spectra = XDataList,
-            LowerLimit = min(All_XData[[1]][1,-1]),
-            HigherLimit = max(All_XData[[1]][1,-1])
+            LowerLimit = min(All_XData_p[[1]][1,-1]),
+            HigherLimit = max(All_XData_p[[1]][1,-1])
         )
         
         dtable <- datatable(truncDF,rownames = F, width='800px',
@@ -386,37 +355,19 @@ shinyServer(function(input, output, session) {
     ## Reacts to number of PCs ----
     observeEvent(input$npcs,{
         for (k in 1:length(All_XData_p)){
-            dats <- All_XData_p[[k]][-1,-1]
-            #normalize matrices by closure by default
-            L <- ncol(dats)
-            dats <- t(apply(dats,1,function(z) z*L/sum(z))) 
-            #Compute PCA on normalized spectra
-            nCP <- input$npcs #hard limit to 15 CPs
-            pcdum <- prcomp(dats, rank=nCP)
-            #Compute in-model and perpendicular distances
-            pca2<-pr_2_prin(pcdum)
-            dd <- chemometrics::pcaDiagplot(dats,pca2,a=nCP,
-                                            plot=FALSE,scale=FALSE)
-            PCAs_dds[[names(All_XData_p)[k]]] <<- cbind(dd$SDist,dd$ODist)
-            PCAs_dds_crit[[names(All_XData_p)[k]]] <<- c(dd$critSD,dd$critOD)
-            
-            #Finalise PCA scores matrix
-            rownames(pcdum$x) <- All_XData_p[[k]][-1,1]
-            #Add SDist and ODist columns
-            pcdum$x <- cbind(pcdum$x,dd$SDist,dd$ODist)
-            colnames(pcdum$x) <- c(paste0("PC",1:nCP),
-                                   "SDist","ODist")
-            rownames(pcdum$rotation) <- All_XData_p[[k]][1,-1]
-            colnames(pcdum$rotation) <- All_XData_p[[k]][-1,1][1:nCP]
-            PCAs[[names(All_XData_p)[k]]] <<- pcdum
+          leNom <- names(All_XData_p)[k]
+          dum <- All_XData_p[[leNom]]
+          dats <- dum[-1,-1]
+          # #Compute PCA on normalized spectra
+          lesChoix <- computePCA(input$npcs, dum, leNom)
         }
         #Populate select CPs to plot
-        leschoix <- colnames(pcdum$x)
+        
         updateSelectInput(session,"pc1",
-                          choices = leschoix,
+                          choices = lesChoix,
                           selected="SDist")
         updateSelectInput(session,"pc2",
-                          choices = leschoix,
+                          choices = lesChoix,
                           selected="ODist")
         proxy_Ys %>% selectRows(NULL)
     }, ignoreInit = T)
@@ -469,29 +420,11 @@ shinyServer(function(input, output, session) {
                 All_XData_p[[k]] <<- All_XData_p[[k]][-(1+lesRows),]
                 
                 #COmpute PCA on preprocessed data
-                dats <- All_XData_p[[k]][-1,-1]
-                #normalize matrices by closure by default
-                L <- ncol(dats)
-                dats <- t(apply(dats,1,function(z) z*L/sum(z))) 
-                #Compute PCA on normalized spectra
-                nCP <- input$npcs #hard limit to 15 CPs
-                pcdum <- prcomp(dats, rank=nCP)
-                #Compute in-model and perpendicular distances
-                pca2<-pr_2_prin(pcdum)
-                dd <- chemometrics::pcaDiagplot(dats,pca2,a=nCP,
-                                                plot=FALSE,scale=FALSE)
-                PCAs_dds[[names(All_XData)[k]]] <<- cbind(dd$SDist,dd$ODist)
-                PCAs_dds_crit[[names(All_XData)[k]]] <<- c(dd$critSD,dd$critOD)
-                
-                #Finalise PCA scores matrix
-                rownames(pcdum$x) <- All_XData[[k]][-1,1]
-                #Add SDist and ODist columns
-                pcdum$x <- cbind(pcdum$x,dd$SDist,dd$ODist)
-                colnames(pcdum$x) <- c(paste0("PC",1:nCP),
-                                       "SDist","ODist")
-                rownames(pcdum$rotation) <- All_XData_p[[k]][1,-1]
-               # colnames(pcdum$rotation) <- All_XData[[k]][-1,1][1:nCP]
-                PCAs[[names(All_XData)[k]]] <<- pcdum
+                leNom <- names(All_XData_p)[k]
+                dum <- All_XData_p[[leNom]]
+                dats <- dum[-1,-1]
+                # #Compute PCA on normalized spectra
+                lesChoix <- computePCA(input$npcs, dum, leNom)
             }
         }
         proxy_Ys %>% selectRows(NULL)
@@ -501,41 +434,41 @@ shinyServer(function(input, output, session) {
     ## Reacts to restoreOriData button ----
     observeEvent(input$restoreOriData, {
         Ys_df <<- ORI_Ys_df
+        #Table of Ys
         dtable <- DT::datatable(Ys_df, width = '900px',
                                 options=list(
-                                    lengthMenu = list(c(10, 15, 20, -1), c('10', '15', '20','All')),
-                                    pageLength = 20,
-                                    scrollX = TRUE,
-                                    columnDefs = list(list(orderable = TRUE, targets = 0))
-                                ))
+                                  autoWidth=FALSE,
+                                  lengthMenu = list(c(10, 15, 20, -1), c('10', '15', '20','All')),
+                                  pageLength = 10,
+                                  scrollX = TRUE,
+                                  columnDefs = list(
+                                    list(orderable = TRUE, targets = 0),
+                                    list(width = '15px', targets = 0),
+                                    list(width = '75px', targets = 1:(ncol(Ys_df)-1)),
+                                    list(className = "dt-center", targets = "_all")
+                                  )
+                                ),
+                                filter='top')
         dtable$x$data[[1]] <- as.numeric(dtable$x$data[[1]])-1
+        #Force name of column for sample ID to ID
+        colnames(dtable$x$data)[2] <- "ID"  #by default row number (0 based) on
+        # first column
         Yvalues$dfWorking <- dtable
+        
         
         All_XData <<- ORI_XData
         for (k in 1:length(All_XData)){
             dats <- All_XData[[k]][-1,-1]
+            #COmpute PCA on preprocessed data
+            leNom <- names(All_XData)[k]
+            dum <- All_XData[[leNom]]
+            dats <- dum[-1,-1]
             #normalize matrices by closure by default
             L <- ncol(dats)
             dats <- t(apply(dats,1,function(z) z*L/sum(z)))
+            
             #Compute PCA on normalized spectra
-            nCP <- input$npcs 
-            pcdum <- prcomp(dats, rank=nCP)
-            #Compute in-model and perpendicular distances
-            pca2<-pr_2_prin(pcdum)
-            dd <- chemometrics::pcaDiagplot(dats,pca2,a=nCP,
-                                            plot=FALSE,scale=FALSE)
-            PCAs_dds[[names(All_XData)[k]]] <<- cbind(dd$SDist,dd$ODist)
-            PCAs_dds_crit[[names(All_XData)[k]]] <<- c(dd$critSD,dd$critOD)
-
-            #Finalise PCA scores matrix
-            rownames(pcdum$x) <- All_XData[[k]][-1,1]
-            #Add SDist and ODist columns
-            pcdum$x <- cbind(pcdum$x,dd$SDist,dd$ODist)
-            colnames(pcdum$x) <- c(paste0("PC",1:nCP),
-                                   "SDist","ODist")
-            rownames(pcdum$rotation) <- All_XData[[k]][1,-1]
-            colnames(pcdum$rotation) <- All_XData[[k]][-1,1][1:nCP]
-            PCAs[[names(All_XData)[k]]] <<- pcdum
+            lesChoix <- computePCA(input$npcs, dum, leNom)
         }
         proxy_Ys %>% selectRows(NULL)
         

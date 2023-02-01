@@ -18,6 +18,33 @@ mesCouleurs <- paletteer::paletteer_d("Polychrome::palette36")
 
 # Functions for the app ----
 
+computePCA <- function(nCP,dum, leNom)
+{
+  dats <- dum[-1,-1]
+  #Compute PCA on normalized spectra
+  pcdum <- prcomp(dats, rank=nCP)
+  #Compute in-model and perpendicular distances
+  pca2<-pr_2_prin(pcdum)
+  dd <- chemometrics::pcaDiagplot(dats,pca2,a=nCP,
+                                  plot=FALSE,scale=FALSE)
+  PCAs_dds[[leNom]] <<- cbind(dd$SDist,dd$ODist)
+  PCAs_dds_crit[[leNom]] <<- c(dd$critSD,dd$critOD)
+  
+  #Finalise PCA scores matrix
+  rownames(pcdum$x) <- dum[-1,1]
+  #Add SDist and ODist columns
+  pcdum$x <- cbind(pcdum$x,dd$SDist,dd$ODist)
+  colnames(pcdum$x) <- c(paste0("PC",1:nCP),
+                         "SDist","ODist")
+  
+  dum[-1,-1] <- dats
+  rownames(pcdum$rotation) <- dum[1,-1]
+  colnames(pcdum$rotation) <- dum[-1,1][1:nCP]
+  PCAs[[leNom]] <<- pcdum
+  lesChoix <- colnames(pcdum$x)
+  return(lesChoix)
+ }
+
 dfForPlotly <- function(dataList,dats,selection)
 # Convert data in dats based on selection of type (datalist) and selection
 # of samples (selection).  Output a data frame ready for plotly
