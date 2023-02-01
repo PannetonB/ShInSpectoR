@@ -1,38 +1,31 @@
 #
-# This is the server logic of a Shiny web application. You can run the
-# application by clicking 'Run App' above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
+#Server for ShInSpectoR
 
 
 
-# Define server logic required to draw a histogram
 shinyServer(function(input, output, session) {
 
-    
+    # To make modal window for loading plots draggable ----
     jqui_draggable('#modalExample')
     
+    
+    # Defines table contents as reactive and create proxys ----
+    ## On Data tab ----
     Yvalues <- reactiveValues(dfWorking = Ys_df)
+    output$Ys <- renderDataTable({
+      Yvalues$dfWorking
+    })
+    proxy_Ys = dataTableProxy('Ys')
+    
+    ## On Prepro tab ----
     PPvaluesTrunc <- reactiveValues(dfWorking = data.frame())
     PPvaluesPerSpectra <- reactiveValues(dfWorking = data.frame())
     PPvaluesSavgol <- reactiveValues(dfWorking = data.frame())
-    
-    
-    output$Ys <- renderDataTable({
-        Yvalues$dfWorking
-    })
-    
-    
     
     output$PreProsTrunc <- renderDataTable({
         PPvaluesTrunc$dfWorking
     })
 
-    
-    
     output$PreProsPerSpectra <- renderDataTable({
         PPvaluesPerSpectra$dfWorking
     })
@@ -41,11 +34,13 @@ shinyServer(function(input, output, session) {
         PPvaluesSavgol$dfWorking
     })
     
-    proxy_Ys = dataTableProxy('Ys')
+   
     proxy_PreProTrunc = dataTableProxy('PreProsTrunc')
     proxy_PreProsPerSpectra = dataTableProxy('PreProsPerSpectra')
     proxy_PreProsSavgol = dataTableProxy('PreProsSavgol')
     
+    # On Data tab ----
+    ## Shows Y filename. Triggered by input$files ----
     output$yFileName <- renderText({
             inFile <- input$files
             if (is.null(inFile)){
@@ -55,6 +50,8 @@ shinyServer(function(input, output, session) {
             inFile$name[indi]
         })
     
+    ## Plot spectra ----
+    # Triggered by selection in Ys
     output$spectraPlots <- renderPlotly({
         s <- unique(input$Ys_rows_selected)
         if (length(s)) {
@@ -75,6 +72,7 @@ shinyServer(function(input, output, session) {
         }
     })
     
+    ## Plot PCA ----
     output$acpPlots <- renderPlotly({
         s <- unique(input$Ys_rows_selected)
         if (length(s)) {
@@ -176,11 +174,12 @@ shinyServer(function(input, output, session) {
     
    
    
-     
+    ## Toggles Plot Loadings action button ---- 
     observe({ toggle(id="plotloadings", 
                      condition=all(stringr::str_detect(c(input$pc1,input$pc2),"PC")))})
     
     
+    ## Loads data ----
     observeEvent(input$files, {
         k=1
         inFile <- input$files
@@ -274,6 +273,8 @@ shinyServer(function(input, output, session) {
             
             #Find average location of dip for all samples.
             wvDip <- round(quantile(wvDips,probs=0.9,na.rm=T))
+            #If wvDip too close to EXwv, default do EXwv + 25
+            if (wvDip<(EXwv+10)) wvDip <- wvDip+25
             
             #Truncation
             inTrunc <- dats[1,-1]>wvDip
@@ -381,13 +382,8 @@ shinyServer(function(input, output, session) {
         ignoreInit = T
     )
     
-    observeEvent(input$PreProsTrunc_cell_edit, {
-      print("Bingo")
-      row  <- input$PreProsTrunc_cell_edit$row
-      clmn <- input$PreProsTrunc_cell_edit$col
-      PPvaluesTrunc$dfWorking$x$data[row, clmn] <- input$PreProsTrunc_cell_edit$value
-    })
     
+    ## Reacts to number of PCs ----
     observeEvent(input$npcs,{
         for (k in 1:length(All_XData_p)){
             dats <- All_XData_p[[k]][-1,-1]
@@ -425,6 +421,8 @@ shinyServer(function(input, output, session) {
         proxy_Ys %>% selectRows(NULL)
     }, ignoreInit = T)
     
+    
+    ## Reacts to X selection ----
     observe({
         XDataList <<- input$Xs
         
@@ -452,10 +450,13 @@ shinyServer(function(input, output, session) {
         proxy_Ys %>% selectRows(NULL)
     })
     
+    
+    ## Reacts to clearRows button ----
     observeEvent(input$clearRows, {
         proxy_Ys %>% selectRows(NULL)
     })
     
+    ## Reacts to deleteRows button ----
     observeEvent(input$deleteRows, {
         if (!is.null(input$Ys_rows_selected)) {
             lesRows <- unique(as.numeric(input$Ys_rows_selected))
@@ -488,8 +489,8 @@ shinyServer(function(input, output, session) {
                 pcdum$x <- cbind(pcdum$x,dd$SDist,dd$ODist)
                 colnames(pcdum$x) <- c(paste0("PC",1:nCP),
                                        "SDist","ODist")
-                rownames(pcdum$rotation) <- All_XData[[k]][1,-1]
-                colnames(pcdum$rotation) <- All_XData[[k]][-1,1][1:nCP]
+                rownames(pcdum$rotation) <- All_XData_p[[k]][1,-1]
+               # colnames(pcdum$rotation) <- All_XData[[k]][-1,1][1:nCP]
                 PCAs[[names(All_XData)[k]]] <<- pcdum
             }
         }
@@ -497,6 +498,7 @@ shinyServer(function(input, output, session) {
     })
     
     
+    ## Reacts to restoreOriData button ----
     observeEvent(input$restoreOriData, {
         Ys_df <<- ORI_Ys_df
         dtable <- DT::datatable(Ys_df, width = '900px',
@@ -539,6 +541,7 @@ shinyServer(function(input, output, session) {
         
     })
     
+    ## Reacts to click on pcaPlot ----
     observeEvent(event_data("plotly_click",source ="pcaPlot"),
                  {
                        d <- event_data("plotly_click",source ="pcaPlot")
@@ -553,6 +556,7 @@ shinyServer(function(input, output, session) {
                  ignoreInit = T
                  )
     
+    ## Reacts to selection on pcaPlot ----
     observeEvent(event_data("plotly_selected",source ="pcaPlot"),
                  {
                      d <- event_data("plotly_selected",source ="pcaPlot")
@@ -570,6 +574,14 @@ shinyServer(function(input, output, session) {
                  ignoreInit = T
                 )
     
+    # On PrePro tab ----
     
+    ## Reacts to PrePro editing ----
+    observeEvent(input$PreProsTrunc_cell_edit, {
+      print("Bingo")
+      row  <- input$PreProsTrunc_cell_edit$row
+      clmn <- input$PreProsTrunc_cell_edit$col
+      PPvaluesTrunc$dfWorking$x$data[row, clmn] <- input$PreProsTrunc_cell_edit$value
+    })
 
 })

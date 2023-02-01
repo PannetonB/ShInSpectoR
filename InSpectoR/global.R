@@ -1,3 +1,6 @@
+
+# Global variables ----
+## In global environment ----
 PCAs <<- list()  #PCAs of all spectrum types in XDataList
 PCAs_dds <<- list()   #Score and Outside distances of PCAs 
 PCAs_dds_crit <<- list()  #Limits for PCAs_dds
@@ -9,7 +12,11 @@ ORI_Ys_df <<- data.frame()   #As in file Ys
 XDataList <<- character()   #List of current spectra types
 ALLXDataList <<- character() #List of loaded spectra types
 
+## In Shiny app ----
+
 mesCouleurs <- paletteer::paletteer_d("Polychrome::palette36")
+
+# Functions for the app ----
 
 dfForPlotly <- function(dataList,dats,selection)
 # Convert data in dats based on selection of type (datalist) and selection

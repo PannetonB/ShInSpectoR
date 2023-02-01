@@ -7,6 +7,7 @@
 #    http://shiny.rstudio.com/
 #
 
+# Load libraries ----
 library(shiny)
 library(shinyjs)
 library(shinyBS)
@@ -18,26 +19,27 @@ library(rhandsontable)
 
 # Define UI for application that draws a histogram
 
-
+# The interface ----
 
 shinyUI(fluidPage(
     useShinyjs(),
-    #Darker horizontal line
+    ##Darker horizontal line ----
     tags$head(
         tags$style(HTML("hr {border-top: 1px solid #000000;}")),
         tags$style(HTML("table {table-layout: fixed;}"))    #For setting column widths,
         
     ),
 
-    # Application title
+    ## Application title ----
     fluidRow(
         column(6,titlePanel("InSpecteuR on Shiny 0.1"),div(style = "height:10px;")),
         column(6,align="right", div(style = "height:10px;"), 
                img(src="InSpecteuR_Logo_Small.png"),)
     ),
         
-    # Barre de titres
+    ## Main tabs ----
     navbarPage("Main tabs",
+               ### Data tab ----
                tabPanel("Data",
                     sidebarLayout(
                         sidebarPanel(width=2,
@@ -56,7 +58,7 @@ shinyUI(fluidPage(
                             h2("PCA"),
                             selectInput("PCA_data","X data for PCA",
                                         choices=character(0L), multiple=F),
-                            sliderInput("npcs","Number of PCs",1,20,10,1),
+                            sliderInput("npcs","Number of PCs",1,20,2,1),
                             selectInput("pc1","PC on horizontal axis",
                                         choices=character(0L), multiple=F),
                             
@@ -103,6 +105,7 @@ shinyUI(fluidPage(
                     ) 
                     
                ),
+               ### Preprocessing tab ----
                tabPanel("Preprocessing",
                         h3("TRUNCATION"),
                         DT::dataTableOutput("PreProsTrunc", width = '800px'),
@@ -111,10 +114,19 @@ shinyUI(fluidPage(
                         h3("SAVITZKY-GOLAY"),
                         DT::dataTableOutput('PreProsSavgol')),
                
+               
+               ### PCA tab ----
                tabPanel("PCA"),
+               
+               ### PLSDA tab ----
                tabPanel("PLSDA"),
+               
+               ### PLS tab ----
                tabPanel("PLS"),
+               
+               ### Apply models tab ----
                tabPanel("Apply models")
+               
                
     )
 ))
