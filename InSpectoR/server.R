@@ -75,7 +75,7 @@ shinyServer(function(input, output, session) {
     ## Plot PCA ----
     output$acpPlots <- renderPlotly({
         s <- unique(input$Ys_rows_selected)
-        
+        dum <- input$npcs
         mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
         t <- list(
           family = "sans serif",
@@ -292,6 +292,9 @@ shinyServer(function(input, output, session) {
             #If wvDip too close to EXwv, default do EXwv + 25
             if (wvDip<(EXwv+10)) wvDip <- wvDip+25
             
+            #Store to RayleighCutoffs
+            RayleighCutoffs[[leNom]] <<- wvDip
+            
             #Truncation
             inTrunc <- dats[1,-1]>wvDip
             dum <- All_XData[[jj]][,c(TRUE,inTrunc)]
@@ -307,6 +310,8 @@ shinyServer(function(input, output, session) {
             All_XData_p[[leNom]] <<-dum 
             # #Compute PCA on normalized spectra
             lesChoix <- computePCA(input$npcs, dum, leNom)
+            #Store dummy to RayleighCutoffs
+            RayleighCutoffs[[leNom]] <<- All_XData[[leNom]][1,2]
           }
         }
         
@@ -389,8 +394,9 @@ shinyServer(function(input, output, session) {
         #Truncation
         truncDF <- data.frame(
           Spectra = XDataList,
-          LowerLimit = unlist(lapply(as.list(XDataList), function(iii)
-                                               min(All_XData_p[[iii]][1,-1]))),
+          # LowerLimit = unlist(lapply(as.list(XDataList), function(iii)
+          #                                      min(All_XData_p[[iii]][1,-1]))),
+          LowerLimit = unlist(RayleighCutoffs[XDataList]),
           HigherLimit = unlist(lapply(as.list(XDataList), function(iii)
             max(All_XData_p[[iii]][1,-1])))
         )
@@ -404,7 +410,6 @@ shinyServer(function(input, output, session) {
         
         
         PPvaluesTrunc$dfWorking <- dtable
-        
         #Cancel selections in Ys table
         proxy_Ys %>% selectRows(NULL)
     })
@@ -529,10 +534,15 @@ shinyServer(function(input, output, session) {
     
     ## Reacts to PrePro editing ----
     observeEvent(input$PreProsTrunc_cell_edit, {
-      print("Bingo")
       row  <- input$PreProsTrunc_cell_edit$row
-      clmn <- input$PreProsTrunc_cell_edit$col
+      clmn <- input$PreProsTrunc_cell_edit$col+1
       PPvaluesTrunc$dfWorking$x$data[row, clmn] <- input$PreProsTrunc_cell_edit$value
+      Apply_PrePro(PPvaluesTrunc)
+      #Force redraw
+      s <- unique(input$Ys_rows_selected)
+      proxy_Ys %>% selectRows(NULL)
+      proxy_Ys %>% selectRows(s)
+      
     })
 
 })
