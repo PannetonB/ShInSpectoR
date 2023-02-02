@@ -75,23 +75,26 @@ shinyServer(function(input, output, session) {
     ## Plot PCA ----
     output$acpPlots <- renderPlotly({
         s <- unique(input$Ys_rows_selected)
+        
+        mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
+        t <- list(
+          family = "sans serif",
+          size = 14,
+          color = toRGB("red"))
+        
+        lePCA <- input$PCA_data
+        lepc1 <- as.formula(paste0("~",input$pc1))
+        lepc2 <- as.formula(paste0("~",input$pc2))
+        ptColor <- as.formula(paste0("~",input$pcaPtColorBy))
+        dfsPCA <- as.data.frame(PCAs[[lePCA]]$x)
+        dfsPCA <- cbind(dfsPCA,Ys_df[input$pcaPtColorBy])
+        
+        ### Something was selected ----
         if (length(s)) {
             s <- sort(s)
-            lePCA <- input$PCA_data
-            lepc1 <- as.formula(paste0("~",input$pc1))
-            lepc2 <- as.formula(paste0("~",input$pc2))
-            ptColor <- as.formula(paste0("~",input$pcaPtColorBy))
-            dfsPCA <- as.data.frame(PCAs[[lePCA]]$x)
-            dfsPCA <- cbind(dfsPCA,Ys_df[input$pcaPtColorBy])
+            
             dfsPCA_unsel <- dfsPCA[-s,]
             dfsPCA_sel <- dfsPCA[s,]
-          
-            mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
-            
-            t <- list(
-                family = "sans serif",
-                size = 14,
-                color = toRGB("red"))
             
             
             p <- plotly::plot_ly(source="pcaPlot"
@@ -138,11 +141,44 @@ shinyServer(function(input, output, session) {
                     p
             )
             
-        }else
-            plotly_empty(type='scatter',mode="markers",source="pcaPlot") %>% 
+        }else   
+        ### Nothing was selected ----
+          if (nrow(dfsPCA)){
+            p <- plotly::plot_ly(source="pcaPlot"
+            ) %>%
+            add_markers(data=dfsPCA,          #Plot all points
+                        x=lepc1, y=lepc2,
+                        type = "scatter", mode = "markers",
+                        color=ptColor,
+                        colors = mycolors,
+                        size=8,
+                        text=as.character(Ys_df[[1]]),
+                        hovertext=as.character(Ys_df[,input$pcaPtColorBy]),
+                        hovertemplate = paste('EchID: %{text}')) %>% 
+            layout(dragmode = "select") %>%
+            event_register("plotly_click") %>%
+            event_register("plotly_brushing") %>%
+            event_register("plotly_doubleclick")
+          
+          # Add confidence limits for SDist and/or ODist
+          p <- switch(input$pc1,
+                      SDist = p %>% layout(shapes = list(vline(PCAs_dds_crit[[lePCA]][1]))),
+                      ODist = p %>% layout(shapes = list(vline(PCAs_dds_crit[[lePCA]][2]))),
+                      p
+          )
+          p <- switch(input$pc2,
+                      SDist = p %>% layout(shapes = list(hline(PCAs_dds_crit[[lePCA]][1]))),
+                      ODist = p %>% layout(shapes = list(hline(PCAs_dds_crit[[lePCA]][2]))),
+                      p
+          )
+          
+          }else  #no data in dfsPCA
+          {
+            plotly_empty(type='scatter',mode="markers",source="pcaPlot") %>%
             event_register("plotly_click") %>%
             event_register("plotly_brushing") %>%
             event_register("plotly_selected")
+          }
     })
     
     ## Plot loadings in a modal window ----
@@ -259,12 +295,7 @@ shinyServer(function(input, output, session) {
             #Truncation
             inTrunc <- dats[1,-1]>wvDip
             dum <- All_XData[[jj]][,c(TRUE,inTrunc)]
-            
-            #normalize matrices by closure by default for fluorescence
-            dats <- dum[-1,-1]
-            L <- ncol(dats)
-            dats <- t(apply(dats,1,function(z) z*L/sum(z)))
-            dum[-1,-1] <- dats
+            dum <- normLigne(dum)
             All_XData_p[[leNom]] <<-dum  
             
             # #Compute PCA on normalized spectra
@@ -272,11 +303,7 @@ shinyServer(function(input, output, session) {
           }
           else{
             #normalize matrices by closure by default
-            dum <- All_XData[[leNom]]
-            dats <- dum[-1,-1]
-            L <- ncol(dats)
-            dats <- t(apply(dats,1,function(z) z*L/sum(z)))
-            dum[-1,-1] <- dats
+            dum <- normLigne(All_XData[[leNom]])
             All_XData_p[[leNom]] <<-dum 
             # #Compute PCA on normalized spectra
             lesChoix <- computePCA(input$npcs, dum, leNom)
@@ -327,26 +354,6 @@ shinyServer(function(input, output, session) {
                                             # first column
         Yvalues$dfWorking <- dtable
         
-        #Tables of PrePros
-        XDataList <<- inFile$name[indi][1]
-        nX <- length(XDataList)
-        #Truncation
-        truncDF <- data.frame(
-            Spectra = XDataList,
-            LowerLimit = min(All_XData_p[[1]][1,-1]),
-            HigherLimit = max(All_XData_p[[1]][1,-1])
-        )
-        
-        dtable <- datatable(truncDF,rownames = F, width='800px',
-                            options = list(dom = 't',
-                                           scrollX=TRUE),
-                            editable=TRUE
-                            
-        )
-        
-        
-        PPvaluesTrunc$dfWorking <- dtable
-        
         },
         ignoreInit = T
     )
@@ -377,14 +384,15 @@ shinyServer(function(input, output, session) {
     observe({
         XDataList <<- input$Xs
         
+        
         #Update prepro tables 
         #Truncation
         truncDF <- data.frame(
           Spectra = XDataList,
           LowerLimit = unlist(lapply(as.list(XDataList), function(iii)
-                                               min(All_XData[[iii]][1,-1]))),
+                                               min(All_XData_p[[iii]][1,-1]))),
           HigherLimit = unlist(lapply(as.list(XDataList), function(iii)
-            max(All_XData[[iii]][1,-1])))
+            max(All_XData_p[[iii]][1,-1])))
         )
         
         dtable <- datatable(truncDF,rownames = F, width='800px',
@@ -458,19 +466,29 @@ shinyServer(function(input, output, session) {
         
         All_XData <<- ORI_XData
         for (k in 1:length(All_XData)){
-            dats <- All_XData[[k]][-1,-1]
-            #COmpute PCA on preprocessed data
             leNom <- names(All_XData)[k]
-            dum <- All_XData[[leNom]]
-            dats <- dum[-1,-1]
-            #normalize matrices by closure by default
-            L <- ncol(dats)
-            dats <- t(apply(dats,1,function(z) z*L/sum(z)))
+            #Truncation
+            wv <- All_XData_p[[leNom]][1,-1]
+            i1 <- which(All_XData[[leNom]][1,-1]==min(wv))
+            i2 <- which(All_XData[[leNom]][1,-1]==max(wv))
+            All_XData_p[[leNom]] <<- All_XData[[leNom]][,1+c(0,i1:i2)]
+            #COmpute PCA on preprocessed data
+            dum <- All_XData_p[[leNom]]
+            dum <- normLigne(All_XData_p[[leNom]])
+            All_XData_p[[leNom]] <<-dum 
             
             #Compute PCA on normalized spectra
             lesChoix <- computePCA(input$npcs, dum, leNom)
         }
         proxy_Ys %>% selectRows(NULL)
+        
+        #Populate select CPs to plot
+        updateSelectInput(session,"pc1",
+                          choices = lesChoix,
+                          selected="SDist")
+        updateSelectInput(session,"pc2",
+                          choices = lesChoix,
+                          selected="ODist")
         
     })
     

@@ -7,7 +7,7 @@ PCAs_dds_crit <<- list()  #Limits for PCAs_dds
 All_XData <<- list()  #Current set of spectra, one type per element of list
 All_XData_p <<- list()  #Current set of preprocessed spectra, one type per element of list
 ORI_XData <<- list()  #As in file set of spectra
-Ys_df <<- data.frame()  #Current Ys 
+Ys_df <<- data.frame(ID=character(0))  #Current Ys 
 ORI_Ys_df <<- data.frame()   #As in file Ys
 XDataList <<- character()   #List of current spectra types
 ALLXDataList <<- character() #List of loaded spectra types
@@ -43,7 +43,15 @@ computePCA <- function(nCP,dum, leNom)
   PCAs[[leNom]] <<- pcdum
   lesChoix <- colnames(pcdum$x)
   return(lesChoix)
- }
+}
+
+normLigne <- function(dum){
+  dats <- dum[-1,-1]
+  L <- ncol(dats)
+  dats <- t(apply(dats,1,function(z) z*L/sum(z)))
+  dum[-1,-1] <- dats
+  return(dum)
+}
 
 dfForPlotly <- function(dataList,dats,selection)
 # Convert data in dats based on selection of type (datalist) and selection

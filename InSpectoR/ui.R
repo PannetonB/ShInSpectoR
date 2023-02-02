@@ -60,13 +60,13 @@ shinyUI(fluidPage(
                                         choices=character(0L), multiple=F),
                             sliderInput("npcs","Number of PCs",1,20,2,1),
                             selectInput("pc1","PC on horizontal axis",
-                                        choices=character(0L), multiple=F),
+                                        choices="PC1", multiple=F),
                             
                             selectInput("pc2","PC on vertital axis",
-                                        choices=character(0L), multiple=F),
+                                        choices="PC2", multiple=F),
                             
                             selectInput("pcaPtColorBy", "Pick factor for point coloring",
-                                        choices=character(0L), multiple=F),
+                                        choices="ID", multiple=F),
                             actionButton('plotloadings', 'Plot loadings')
                             ),
                         
