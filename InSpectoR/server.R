@@ -1,7 +1,7 @@
 #
 #Server for ShInSpectoR
 
-
+inserted_perSpectrumOptions <- c()
 
 shinyServer(function(input, output, session) {
 
@@ -398,19 +398,57 @@ shinyServer(function(input, output, session) {
           #                                      min(All_XData_p[[iii]][1,-1]))),
           LowerLimit = unlist(RayleighCutoffs[XDataList]),
           HigherLimit = unlist(lapply(as.list(XDataList), function(iii)
-            max(All_XData_p[[iii]][1,-1])))
+            max(All_XData[[iii]][1,-1])))
         )
         
         dtable <- datatable(truncDF,rownames = F, width='800px',
                             options = list(dom = 't',
                                            scrollX=TRUE),
-                            editable=TRUE
+                            editable = list(target = "cell", 
+                                            disable = list(columns = 0))
                             
         )
         
         
         PPvaluesTrunc$dfWorking <- dtable
-        #Cancel selections in Ys table
+        
+        #Remove all entries in the perSpectrumOptions section
+        for (k in inserted_perSpectrumOptions){
+          removeUI(selector = paste0('#', k))
+        }
+        inserted_perSpectrumOptions <<- c()
+        
+
+        k=0
+        for (kk in XDataList){
+          k <- k+1
+          id <- paste0("perSpectrumOpt",k)
+          inserted_perSpectrumOptions <<- c(id,inserted_perSpectrumOptions)
+          insertUI(
+            selector = "#placeholder",
+            where = "afterEnd",
+            ui = tags$div(id=id,
+                          radioButtons(id,
+                              "",
+                              choiceNames = list(
+                                "None",
+                                "Closure (mean=1)",
+                                "Waveband"
+                              ),
+                              selected = "closure",
+                              choiceValues = list(
+                                "none", "closure", "waveband"
+                              ),
+                              inline = T)
+            )
+          )
+        }
+        
+        
+        
+        #Apply default prepro
+        Apply_PrePro(PPvaluesTrunc)
+        #Force redraw
         proxy_Ys %>% selectRows(NULL)
     })
     
@@ -536,7 +574,7 @@ shinyServer(function(input, output, session) {
     observeEvent(input$PreProsTrunc_cell_edit, {
       row  <- input$PreProsTrunc_cell_edit$row
       clmn <- input$PreProsTrunc_cell_edit$col+1
-      PPvaluesTrunc$dfWorking$x$data[row, clmn] <- input$PreProsTrunc_cell_edit$value
+      PPvaluesTrunc$dfWorking$x$data[row, clmn] <- as.numeric(input$PreProsTrunc_cell_edit$value)
       Apply_PrePro(PPvaluesTrunc)
       #Force redraw
       s <- unique(input$Ys_rows_selected)

@@ -110,6 +110,7 @@ shinyUI(fluidPage(
                         h3("TRUNCATION"),
                         DT::dataTableOutput("PreProsTrunc", width = '800px'),
                         h3("PER SPECTRUM NORMALIZATION"),
+                        tags$div(id = 'placeholder'),
                         DT::dataTableOutput('PreProsPerSpectra'),
                         h3("SAVITZKY-GOLAY"),
                         DT::dataTableOutput('PreProsSavgol')),

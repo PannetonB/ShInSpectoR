@@ -34,14 +34,21 @@ Apply_PrePro <- function(PPvaluesTrunc)
   #in column 1 to 3 respectively
   params <- isolate(PPvaluesTrunc$dfWorking)$x$data
   
-  trunc_limits <- as.matrix(params[,-1])
+  trunc_limits <- params[,-1]
   lesNoms <- as.list(params[,1])
   
   lapply(lesNoms,function(leNom){
     wl<-All_XData[[leNom]][1,-1]
-    All_XData_p[[leNom]] <<- All_XData[[leNom]][,((wl>=trunc_limits[x,1]) & (wl<=trunc_limits[x,2]))]
+    All_XData_p[[leNom]] <<- All_XData[[leNom]][,((wl>=trunc_limits[leNom,1]) & (wl<=trunc_limits[leNom,2]))]
     NULL
   }) 
+  
+  
+  #-----Closure----
+  lapply(lesNoms,function(leNom){
+    dum <- normLigne(All_XData_p[[leNom]])
+    All_XData_p[[leNom]] <<-dum  
+  })
   
   # #-----Then per_spectra normalization - value-----
   # if (is.null(prepro_par)){   #retrieve from GUI
