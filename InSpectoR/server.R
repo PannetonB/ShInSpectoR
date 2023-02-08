@@ -1,9 +1,11 @@
 #
 #Server for ShInSpectoR
 
-inserted_perSpectrumOptions <- c()
+inserted_perSpectrumOptions <<- c()
 
 shinyServer(function(input, output, session) {
+  
+    
 
     # To make modal window for loading plots draggable ----
     jqui_draggable('#modalExample')
@@ -19,25 +21,11 @@ shinyServer(function(input, output, session) {
     
     ## On Prepro tab ----
     PPvaluesTrunc <- reactiveValues(dfWorking = data.frame())
-    PPvaluesPerSpectra <- reactiveValues(dfWorking = data.frame())
-    PPvaluesSavgol <- reactiveValues(dfWorking = data.frame())
-    
     output$PreProsTrunc <- renderDataTable({
         PPvaluesTrunc$dfWorking
     })
 
-    output$PreProsPerSpectra <- renderDataTable({
-        PPvaluesPerSpectra$dfWorking
-    })
-    
-    output$PreProsSavgol <- renderDataTable({
-        PPvaluesSavgol$dfWorking
-    })
-    
-   
     proxy_PreProTrunc = dataTableProxy('PreProsTrunc')
-    proxy_PreProsPerSpectra = dataTableProxy('PreProsPerSpectra')
-    proxy_PreProsSavgol = dataTableProxy('PreProsSavgol')
     
     # On Data tab ----
     ## Shows Y filename. Triggered by input$files ----
@@ -249,11 +237,14 @@ shinyServer(function(input, output, session) {
                     
                 }else
                 {
-                    All_XData[[inFile$name[ii]]] <<- dum1
+                  leNom <- tools::file_path_sans_ext(inFile$name[[ii]])  
+                  All_XData[[leNom]] <<- dum1
                 }
             }
         }
         ORI_XData <<- All_XData
+        #files are loaded - remove extension from filenames
+        inFile$name<- tools::file_path_sans_ext((inFile$name))
         
         #Sets max nb of pcs to 15 or the number of samples-1 if smaller
         nSamples <- nrow(All_XData[[1]])-1
@@ -267,7 +258,7 @@ shinyServer(function(input, output, session) {
           
           #First find cutoff for Rayleigh
           #Find excitation wavelength
-          leNom <- inFile$name[indi[[jj]]]
+          leNom <- names(All_XData)[jj]
           # Check if this is fluorescence
           isFluo <- substr(leNom,1,2)=="EX"
           if (isFluo){
@@ -387,69 +378,77 @@ shinyServer(function(input, output, session) {
     
     ## Reacts to X selection ----
     observe({
-        XDataList <<- input$Xs
-        
-        
-        #Update prepro tables 
-        #Truncation
-        truncDF <- data.frame(
-          Spectra = XDataList,
-          # LowerLimit = unlist(lapply(as.list(XDataList), function(iii)
-          #                                      min(All_XData_p[[iii]][1,-1]))),
-          LowerLimit = unlist(RayleighCutoffs[XDataList]),
-          HigherLimit = unlist(lapply(as.list(XDataList), function(iii)
-            max(All_XData[[iii]][1,-1])))
-        )
-        
-        dtable <- datatable(truncDF,rownames = F, width='800px',
-                            options = list(dom = 't',
-                                           scrollX=TRUE),
-                            editable = list(target = "cell", 
-                                            disable = list(columns = 0))
-                            
-        )
-        
-        
-        PPvaluesTrunc$dfWorking <- dtable
-        
-        #Remove all entries in the perSpectrumOptions section
-        for (k in inserted_perSpectrumOptions){
-          removeUI(selector = paste0('#', k))
-        }
-        inserted_perSpectrumOptions <<- c()
-        
-
-        k=0
-        for (kk in XDataList){
-          k <- k+1
-          id <- paste0("perSpectrumOpt",k)
-          inserted_perSpectrumOptions <<- c(id,inserted_perSpectrumOptions)
-          insertUI(
-            selector = "#placeholder",
-            where = "afterEnd",
-            ui = tags$div(id=id,
-                          radioButtons(id,
-                              "",
-                              choiceNames = list(
-                                "None",
-                                "Closure (mean=1)",
-                                "Waveband"
-                              ),
-                              selected = "closure",
-                              choiceValues = list(
-                                "none", "closure", "waveband"
-                              ),
-                              inline = T)
-            )
+        XDataList <<- sort(input$Xs)
+        if (length(XDataList>0)){
+          #Update prepro tables 
+          #Truncation
+          truncDF <- data.frame(
+            Spectra = XDataList,
+            # LowerLimit = unlist(lapply(as.list(XDataList), function(iii)
+            #                                      min(All_XData_p[[iii]][1,-1]))),
+            LowerLimit = unlist(RayleighCutoffs[XDataList]),
+            HigherLimit = unlist(lapply(as.list(XDataList), function(iii)
+              max(All_XData[[iii]][1,-1])))
           )
+          dtable <- datatable(truncDF,rownames = F, width='800px',
+                              options = list(dom = 't',
+                                             scrollX=TRUE),
+                              editable = list(target = "cell", 
+                                              disable = list(columns = 0))
+                              
+          )
+          isolate(PPvaluesTrunc$dfWorking <- dtable)
+          
+          #Update per spectrum prepro options
+          #Remove all entries in the perSpectrumOptions section
+          for (k in inserted_perSpectrumOptions){
+            id <- k
+            removeUI(selector = paste0('#', id))
+          }
+          inserted_perSpectrumOptions <<- c()
+          
+          #Loop on all selected data types
+         
+          for (kk in XDataList){
+            wl <- as.numeric(All_XData[[kk]][1,-1])
+            hiWL <- max(wl)
+            lowWL <- as.numeric(RayleighCutoffs[kk])
+            ctr <- round((hiWL+lowWL)/2)
+            id <- kk
+            inserted_perSpectrumOptions <<- c(inserted_perSpectrumOptions,id)
+            insertUI(
+              selector = "#placeholder1",
+              where = "beforeEnd",
+              ui = tags$div(id=id,
+                            flowLayout(
+                              radioButtons(paste0(id,"_A"),
+                                  kk,
+                                  choiceNames = list(
+                                    "None",
+                                    "Closure (mean=1)",
+                                    "Waveband"
+                                  ),
+                                  selected = "closure",
+                                  choiceValues = list(
+                                    "none", "closure", "waveband"
+                                  ),
+                                  inline = T),
+                              numericInput(paste0(id,"_B"), "Band Center",ctr,
+                                           lowWL,hiWL,1),
+                              numericInput(paste0(id,"_C"), 'Bandwidth', 1,1,25,2)
+                            )
+              )
+            )
+          }
+          
+  
+  
+          
+          #Apply default prepro
+          Apply_PrePro(PPvaluesTrunc,input)
+          #Force redraw
+          isolate(proxy_Ys %>% selectRows(NULL))
         }
-        
-        
-        
-        #Apply default prepro
-        Apply_PrePro(PPvaluesTrunc)
-        #Force redraw
-        proxy_Ys %>% selectRows(NULL)
     })
     
     
@@ -571,16 +570,30 @@ shinyServer(function(input, output, session) {
     # On PrePro tab ----
     
     ## Reacts to PrePro editing ----
-    observeEvent(input$PreProsTrunc_cell_edit, {
+    observeEvent(input$PreProsTrunc_cell_edit, isolate({
       row  <- input$PreProsTrunc_cell_edit$row
       clmn <- input$PreProsTrunc_cell_edit$col+1
-      PPvaluesTrunc$dfWorking$x$data[row, clmn] <- as.numeric(input$PreProsTrunc_cell_edit$value)
-      Apply_PrePro(PPvaluesTrunc)
+      laVal <- as.numeric(input$PreProsTrunc_cell_edit$value)
+      PPvaluesTrunc$dfWorking$x$data[row, clmn] <- laVal
+      lowWL <- PPvaluesTrunc$dfWorking$x$data[row, 2]
+      hiWL <- PPvaluesTrunc$dfWorking$x$data[row, 3]
+      id <- paste0(inserted_perSpectrumOptions[row],"_C")
+      WBand <- input[[id]]
+      ctr <- round((hiWL+lowWL)/2)
+      #Update values for ctr and waveband
+      id <- paste0(inserted_perSpectrumOptions[row],"_B")
+      updateNumericInput(session,id,value=ctr,min=lowWL+WBand,max=hiWL-WBand)
+
+    }))
+    
+    ## Reacts to Apply on PrePro tab ----
+    
+    observeEvent(input$applyPrePro,{
+      Apply_PrePro(PPvaluesTrunc,input)
       #Force redraw
       s <- unique(input$Ys_rows_selected)
       proxy_Ys %>% selectRows(NULL)
       proxy_Ys %>% selectRows(s)
-      
     })
 
 })

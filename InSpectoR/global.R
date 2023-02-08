@@ -22,13 +22,14 @@ mesCouleurs <- paletteer::paletteer_d("Polychrome::palette36")
 
 
 #***********************************************************************
-Apply_PrePro <- function(PPvaluesTrunc)
+
+Apply_PrePro <- function(PPvaluesTrunc, input)
   #Apply all preprocessing as defined in the prepro tab.
   # Retrieve parameters from GUI. When prepro parameters are
   # retrieved from a file, they are stored in the GUI (to be
   # implemented).
 {
-  #-----Truncation-----
+  #Truncation-----
   #retrieve from GUI
   #params is a data frame with spectrum type, lower limit and higher limit
   #in column 1 to 3 respectively
@@ -39,84 +40,47 @@ Apply_PrePro <- function(PPvaluesTrunc)
   
   lapply(lesNoms,function(leNom){
     wl<-All_XData[[leNom]][1,-1]
-    All_XData_p[[leNom]] <<- All_XData[[leNom]][,((wl>=trunc_limits[leNom,1]) & (wl<=trunc_limits[leNom,2]))]
-    NULL
+    All_XData_p[[leNom]] <<- All_XData[[leNom]][,c(TRUE,
+                                                   ((wl>=trunc_limits[leNom,1]) & (wl<=trunc_limits[leNom,2])))]
   }) 
   
+  #Retrieve per spectrum norm parameters ----
+  perSpecParams <- lapply(as.list(inserted_perSpectrumOptions), function(opt){
+    para <- c(unlist(isolate(input[[paste0(opt,"_A")]])),
+                 unlist(isolate(input[[paste0(opt,"_B")]])),
+                 unlist(isolate(input[[paste0(opt,"_C")]]))
+                )
+  })
+  names(perSpecParams) <- lesNoms
   
-  #-----Closure----
-  lapply(lesNoms,function(leNom){
-    dum <- normLigne(All_XData_p[[leNom]])
-    All_XData_p[[leNom]] <<-dum  
+  lapply(lesNoms, function(leNom){
+    typePerSpec <- perSpecParams[[leNom]][1]
+    if (length(typePerSpec==1)){
+      switch(typePerSpec,
+             closure = {
+               dum <- normLigne(All_XData_p[[leNom]])
+               All_XData_p[[leNom]] <<-dum  
+             },
+             waveband ={
+               wl <- All_XData_p[[leNom]][1,-1]
+               ctr <- as.numeric(perSpecParams[[leNom]][2])
+               band <- as.numeric(perSpecParams[[leNom]][3])
+               halfband <- floor(band/2)
+               i1 <- ctr-halfband
+               i2 <- ctr+halfband
+               i1 <- which.min(abs(i1-wl))
+               i2 <- which.min(abs(i2-wl))
+               dats <- All_XData_p[[leNom]][-1,-1]
+               L <- ncol(dats)
+               dats <- t(apply(dats,1,function(z) z/mean(z[i1:i2])))
+               All_XData_p[[leNom]][-1,-1] <<- dats
+             })
+    }
   })
   
-  # #-----Then per_spectra normalization - value-----
-  # if (is.null(prepro_par)){   #retrieve from GUI
-  #   N=length(XData_p)
-  #   if (N>1){
-  #     type <- sapply(gf1$children[[1]][-1,2],gWidgets2::svalue,index=TRUE)
-  #   }else
-  #   {
-  #     type <- gWidgets2::svalue(gf1$children[[1]][-1,2],index=TRUE)
-  #   }
-  #   letest=any(type==2)
-  #   prepro_params$byspectra_scaling_index <<- type
-  #   cntr_n_w_table <- sapply(gf1$children[[1]][-1,-1],gWidgets2::svalue)
-  #   cntr_n_w <- matrix(cntr_n_w_table,ncol=3,byrow=FALSE)
-  #   cntr_n_w <- matrix(as.numeric(cntr_n_w[,-1]),ncol=2,byrow=FALSE)
-  #   prepro_params$cntr_n_w <<- cntr_n_w
-  # }else   #extract from prepro_params
-  # {
-  #   type <- prepro_params$byspectra_scaling_index
-  #   letest=any(type==2)
-  #   cntr_n_w <- prepro_params$cntr_n_w
-  #   #load into GUI
-  #   le_r <- lapply(seq_len(nrow(cntr_n_w)), function(i) cntr_n_w[i,])
-  #   gWidgets2::delete(gf1,gf1$children[[1]])
-  #   gf1<-build_byvalue_scaling_widget(XDatalist,gf1,type,le_r)
-  #   
-  # }
-  # if (letest){
-  #   wl<-lapply(XData_p, function(y) y[1,]) # a list of wl vector, one per spectrum type
-  #   X<-lapply(XData_p, function(y) y[-1,]) #a list of spectral data matrix, no wl.
-  #   ii<-as.list(1:nrow(cntr_n_w))
-  #   XData_p <<- lapply(ii,function(x){
-  #     if (type[x]==2){
-  #       i1<-which(wl[[x]]>=(cntr_n_w[x,1]-cntr_n_w[x,2]))[1]
-  #       i2<-which(wl[[x]]>=(cntr_n_w[x,1]+cntr_n_w[x,2]))[1]
-  #       X[[x]]<-t(apply(X[[x]],1,function(z) z/mean(z[i1:i2])))
-  #     }
-  #     rbind(wl[[x]],X[[x]])  #rebuild matrices with wl
-  #   })
-  # }
-  # 
-  # #-----Then per_spectra normalization - closure-----
-  # if (is.null(prepro_par)){   #retrieve from GUI
-  #   N=length(XData)
-  #   if (N>1){
-  #     type <- sapply(gf1$children[[1]][-1,2],gWidgets2::svalue,index=TRUE)
-  #   }else
-  #   {
-  #     type <- gWidgets2::svalue(gf1$children[[1]][-1,2],index=TRUE)
-  #   }
-  #   letest=any(type==3)
-  # }else  #extract from prepro_params
-  # {
-  #   type <- prepro_params$byspectra_scaling_index
-  #   letest<-any(type==3)
-  # }
-  # if (letest){
-  #   wl<-lapply(XData_p, function(y) y[1,]) # a list of wl vector, one per spectrum type
-  #   X<-lapply(XData_p, function(y) y[-1,]) #a list of spectral data matrix, no wl.
-  #   iis<-as.list(1:length(wl))
-  #   XData_p <<- lapply(iis, function(ii){
-  #     if (type[ii]==3){
-  #       L <- length(wl[[ii]])
-  #       X[[ii]]<-t(apply(X[[ii]],1,function(z) z*L/sum(z))) #normalize matrices
-  #     }
-  #     rbind(wl[[ii]],X[[ii]]) #rebuild matrices with wl
-  #   })
-  # } 
+  dum=1
+  
+ 
   # 
   # #-----Then Savitzky-Golay-----
   # if (is.null(prepro_par)){    #retrieve from GUI

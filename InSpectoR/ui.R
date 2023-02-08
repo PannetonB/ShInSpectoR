@@ -16,6 +16,8 @@ library(plotly)
 library(dplyr)
 library(shinyjqui)
 library(rhandsontable)
+library(reactlog)
+#reactlog_enable()
 
 # Define UI for application that draws a histogram
 
@@ -34,7 +36,7 @@ shinyUI(fluidPage(
     fluidRow(
         column(6,titlePanel("InSpecteuR on Shiny 0.1"),div(style = "height:10px;")),
         column(6,align="right", div(style = "height:10px;"), 
-               img(src="InSpecteuR_Logo_Small.png"),)
+               img(src="InSpecteuR_Logo_Small.png"))
     ),
         
     ## Main tabs ----
@@ -110,10 +112,15 @@ shinyUI(fluidPage(
                         h3("TRUNCATION"),
                         DT::dataTableOutput("PreProsTrunc", width = '800px'),
                         h3("PER SPECTRUM NORMALIZATION"),
-                        tags$div(id = 'placeholder'),
-                        DT::dataTableOutput('PreProsPerSpectra'),
+                        tags$div(id = 'placeholder1'),
                         h3("SAVITZKY-GOLAY"),
-                        DT::dataTableOutput('PreProsSavgol')),
+                        tags$div(id = 'placeholder2'),
+                        hr(),
+                        h3("Action buttons"),
+                        actionButton("applyPrePro","Apply"),
+                        actionButton("savePrePro", "Save"),
+                        actionButton("loadPrePro", "Load")
+               ),
                
                
                ### PCA tab ----
