@@ -44,7 +44,8 @@ Apply_PrePro <- function(PPvaluesTrunc, input)
                                                    ((wl>=trunc_limits[leNom,1]) & (wl<=trunc_limits[leNom,2])))]
   }) 
   
-  #Retrieve per spectrum norm parameters ----
+  #Per spectrum norm ----
+  ##Retrieve per spectrum norm parameters ----
   perSpecParams <- lapply(as.list(inserted_perSpectrumOptions), function(opt){
     para <- c(unlist(isolate(input[[paste0(opt,"_A")]])),
                  unlist(isolate(input[[paste0(opt,"_B")]])),
@@ -78,83 +79,49 @@ Apply_PrePro <- function(PPvaluesTrunc, input)
     }
   })
   
-  dum=1
   
- 
-  # 
-  # #-----Then Savitzky-Golay-----
-  # if (is.null(prepro_par)){    #retrieve from GUI
-  #   N=length(XData)
-  #   if (N>1){
-  #     dosavgol <- sapply(gf_savgol$children[[1]][-1,2],gWidgets2::svalue)
-  #     m<-sapply(gf_savgol$children[[1]][-1,4],gWidgets2::svalue)
-  #     p<-sapply(gf_savgol$children[[1]][-1,5],gWidgets2::svalue)
-  #     w<-sapply(gf_savgol$children[[1]][-1,3],gWidgets2::svalue)
-  #   }else
-  #   {
-  #     dosavgol <- gWidgets2::svalue(gf_savgol$children[[1]][-1,2])
-  #     m<-gWidgets2::svalue(gf_savgol$children[[1]][-1,4])
-  #     p<-gWidgets2::svalue(gf_savgol$children[[1]][-1,5])
-  #     w<-gWidgets2::svalue(gf_savgol$children[[1]][-1,3])
-  #   }
-  #   
-  #   letest=any(dosavgol)
-  #   
-  #   prepro_params$do_savgol <<- dosavgol
-  #   prepro_params$m <<- m
-  #   prepro_params$p <<- p
-  #   prepro_params$w <<- w
-  # }else   #extract from prepro_params
-  # {
-  #   N=length(XData)
-  #   dum <- as.list(seq_len(N))
-  #   dosavgol<-prepro_params$do_savgol
-  #   letest=any(dosavgol==TRUE)
-  #   m <- prepro_par$m 
-  #   p <- prepro_params$p
-  #   w <- prepro_par$w
-  #   gWidgets2::delete(gf_savgol,gf_savgol$children[[1]])
-  #   gf_savgol <- build_savgol_widget(XDatalist,gf_savgol)
-  #   sapply(dum, function(ii){
-  #     lecheck <- gf_savgol$children[[1]][(ii+1),2]
-  #     gWidgets2::svalue(lecheck) <- dosavgol[ii]
-  #     lem <- gf_savgol$children[[1]][ii+1,4]
-  #     gWidgets2::svalue(lem) <- m[ii]
-  #     lep <- gf_savgol$children[[1]][ii+1,5]
-  #     gWidgets2::svalue(lep) <- p[ii]
-  #     lew <- gf_savgol$children[[1]][ii+1,3]
-  #     gWidgets2::svalue(lew) <- w[ii]
-  #   })
-  # }
-  # if (letest){
-  #   #retrieve paramaters
-  #   wl<-lapply(XData_p, function(y) y[1,]) # a list of wl vector, one per spectrum type
-  #   #Truncate wl to suit window size (w)
-  #   #Need to adapt length of wl to result of Savitzky-Golay
-  #   iis<-as.list(1:length(wl))
-  #   wl <- lapply(iis,function(k){
-  #     w_2=floor(w[[k]]/2)
-  #     if (dosavgol[k]){
-  #       wl[[k]][(w_2+1):(length(wl[[k]])-w_2)]
-  #     }else
-  #     {
-  #       wl[[k]]
-  #     }
-  #   }
-  #   )
-  #   X<-lapply(XData_p, function(y) y[-1,]) #a list of spectral data matrix, no wl.
-  #   
-  #   
-  #   XData_p <<- lapply(iis, function(k) {
-  #     if (dosavgol[k]){
-  #       X[[k]]<-prospectr::savitzkyGolay(X[[k]],m[k],p[k],w[k])
-  #     }
-  #     rbind(wl[[k]],X[[k]]) #rebuild matrices with wl
-  #   })
-  #   
-  # }
-  # #end
-  # return()
+  #Then Savitzky-Golay-----
+  # Apply?
+  
+  letest <- lapply(as.list(inserted_perSpectrumOptions), function(opt){
+    isolate(input[[paste0(opt,"_D")]])
+  })
+  names(letest) <- lesNoms
+  
+  lesW <- lapply(as.list(inserted_perSpectrumOptions), function(opt){
+    isolate(input[[paste0(opt,"_E")]])
+  })
+  names(lesW) <- lesNoms
+  
+  lesPoly <- lapply(as.list(inserted_perSpectrumOptions), function(opt){
+    isolate(input[[paste0(opt,"_F")]])
+  })
+  names(lesPoly) <- lesNoms
+  
+  lesDeriv <- lapply(as.list(inserted_perSpectrumOptions), function(opt){
+    isolate(input[[paste0(opt,"_G")]])
+  })
+  names(lesDeriv) <- lesNoms
+  
+  if (!any(unlist(lapply(lesW,is.null)))){   #to take of init phase
+    lapply(lesNoms, function(leNom){
+      if (letest[[leNom]]){
+        m <- lesDeriv[[leNom]]
+        p <- lesPoly[[leNom]]
+        w <- lesW[[leNom]]
+        
+        #Adjust length because savGolay truncates
+        w_2=floor(w/2)
+        wl<- All_XData_p[[leNom]][1,-1] # a list of wl vector, one per spectrum type
+        wl <- wl[(w_2+1):(length(wl)-w_2)]
+        
+        X <- All_XData_p[[leNom]][-1,-1]
+        X <- prospectr::savitzkyGolay(X,m,p,w)
+        X <- rbind(wl,X) #rebuild matrices with wl
+        All_XData_p[[leNom]] <<- cbind(All_XData_p[[leNom]][,1],X)
+      }
+    })
+  }
 }
 
 computePCA <- function(nCP,dum, leNom)

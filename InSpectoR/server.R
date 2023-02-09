@@ -9,6 +9,13 @@ shinyServer(function(input, output, session) {
 
     # To make modal window for loading plots draggable ----
     jqui_draggable('#modalExample')
+  
+    #Hide all tabs but Data
+    hideTab(inputId = "tabs", target = 'Preprocessing')
+    hideTab(inputId = "tabs", target = 'PCA')
+    hideTab(inputId = "tabs", target = 'PLS')
+    hideTab(inputId = "tabs", target = 'PLSDA')
+    hideTab(inputId = "tabs", target = 'Apply models')
     
     
     # Defines table contents as reactive and create proxys ----
@@ -350,6 +357,14 @@ shinyServer(function(input, output, session) {
                                             # first column
         Yvalues$dfWorking <- dtable
         
+        
+        ###Show tabs ----
+        showTab(inputId = "tabs", target = 'Preprocessing')
+        showTab(inputId = "tabs", target = 'PCA')
+        showTab(inputId = "tabs", target = 'PLS')
+        showTab(inputId = "tabs", target = 'PLSDA')
+        showTab(inputId = "tabs", target = 'Apply models')
+        
         },
         ignoreInit = T
     )
@@ -435,7 +450,14 @@ shinyServer(function(input, output, session) {
                                   inline = T),
                               numericInput(paste0(id,"_B"), "Band Center",ctr,
                                            lowWL,hiWL,1),
-                              numericInput(paste0(id,"_C"), 'Bandwidth', 1,1,25,2)
+                              numericInput(paste0(id,"_C"), 'Bandwidth', 1,1,25,2),
+                              h3('      '),
+                              checkboxInput(paste0(id,"_D"), strong('SAVITSKY-GOLAY'), FALSE, width='20px'),
+                              numericInput(paste0(id,'_E'), 'Bandwidth',5,5,25,2),
+                              numericInput(paste0(id,'_F'), 'Polynomial order',3,2,10,1),
+                              numericInput(paste0(id,'_G'), 'Derivative order',0,0,2,1)
+                              
+                              
                             )
               )
             )
@@ -595,5 +617,40 @@ shinyServer(function(input, output, session) {
       proxy_Ys %>% selectRows(NULL)
       proxy_Ys %>% selectRows(s)
     })
+    
+    
+    # On PLS tab----
+    output$PLSPlotID <-   renderText("PLOT TYPE ID")
+    output$PLSPlots <- renderPlotly({
+      text = "PLOT OUTPUT AREA"
+      ggplotly(
+        ggplot() + 
+          annotate("text", x = 4, y = 25, size=8, label = text) + 
+          theme_void()
+      )
+    })
+    
+    
+    output$PLSConsole <- renderPrint({
+      dum <- "Console output area"
+      write(dum, file="")
+    })
+    
+    observeEvent(input$tabs,{
+      if(input$tabs == "PLS"){ #set up the pages
+        isolate({
+           updateSelectInput(session,"XsForPLS", choices=input$Xs,
+                             selected=input$Xs[1])
+          lesChoix <- names(Filter(is.factor,Ys_df))
+          updateSelectInput(session,"YForPLS",
+                            choices = lesChoix ,
+                            selected = lesChoix[1])
+          nSamples <- nrow(Ys_df)
+          updateNumericInput(session,"NbLVForPLS",max=min(c((nSamples-1),20))
+)        })
+      } 
+    })
+    
+    
 
 })
