@@ -620,6 +620,7 @@ shinyServer(function(input, output, session) {
     
     
     # On PLS tab----
+    ## Init plot and console areas ----
     output$PLSPlotID <-   renderText("PLOT TYPE ID")
     output$PLSPlots <- renderPlotly({
       text = "PLOT OUTPUT AREA"
@@ -636,6 +637,8 @@ shinyServer(function(input, output, session) {
       write(dum, file="")
     })
     
+    
+    ## Reacts to PLS tab activation ----
     observeEvent(input$tabs,{
       if(input$tabs == "PLS"){ #set up the pages
         isolate({
@@ -646,14 +649,40 @@ shinyServer(function(input, output, session) {
                             choices = lesChoix ,
                             selected = lesChoix[1])
           nSamples <- nrow(Ys_df)
-          updateNumericInput(session,"NbLVForPLS",max=min(c((nSamples-1),20))
-)        })
+          updateNumericInput(session,"NbLVForPLS",max=min(c((nSamples-1),20)))
+          lesChoix <- names(Filter(function(x) is.factor(x),Ys_df))
+          updateSelectInput(session,"PLSPredPlotColorBy",
+                            choices = lesChoix ,
+                            selected = lesChoix[1])
+          
+          updateSelectInput(session,"PLSPredPlotLabel",
+                            choices = lesChoix ,
+                            selected = lesChoix[1])
+          updateSelectInput(session,"PLSScorePlotColorBy",
+                            choices = lesChoix ,
+                            selected = lesChoix[1])
+          })
+        output$PLSPlotID <-   renderText("PLOT TYPE ID")
+        output$PLSPlots <- renderPlotly({
+          text = "PLOT OUTPUT AREA"
+          ggplotly(
+            ggplot() + 
+              annotate("text", x = 4, y = 25, size=8, label = text) + 
+              theme_void()
+          )
+        })
+        output$PLSConsole <- renderPrint({
+          dum <- "Console output area"
+          write(dum, file="")
+        })
       } 
     })
     
+    
+    ## Verify in nb LV is within limits ----
     observeEvent(input$NbLVForPLS,{
       nbLVs <- input$NbLVForPLS
-      if (!is.null(nbLVs)){
+      if (!is.null(nbLVs) & !is.na(nbLVs)){
         nbSamples <- nrow(Ys_df)
         maxi <- min(c(20,(nbSamples-1)))
         if (nbLVs>maxi & maxi>0) {
@@ -662,8 +691,24 @@ shinyServer(function(input, output, session) {
       }
     })
     
+    
+    ##Reacts to Compute button ----
     observeEvent(input$ComputePLS,{
       showNotification("Computing - Be patient!")
+      
+      output$PLSPlots <- renderPlotly({
+        text = "PLOT OUTPUT AREA"
+        ggplotly(
+          ggplot() + 
+            annotate("text", x = 4, y = 25, size=8, label = text) + 
+            theme_void()
+        )
+      })
+      
+      output$PLSConsole <- renderPrint({
+        dum <- "Console output area"
+        write(dum, file="")
+      })
       
         
       #collect parameters
@@ -684,7 +729,7 @@ shinyServer(function(input, output, session) {
         }
         pls_set <<- list(y)
       }
-      plsFit <- lapply(pls_set,function(x){
+      plsFit <<- lapply(pls_set,function(x){
         pls::plsr(formula= V1~., data=x,
                   ncomp=nbLV,
                   validation = valid)
@@ -714,5 +759,145 @@ shinyServer(function(input, output, session) {
       
     }, ignoreInit = T)
     
+    ## Reacts to plot validation button ----
+    observeEvent(input$PLSvalidationPlot,{
+      output$PLSPlotID <-   renderText("ERROR PLOT")
+      output$PLSPlots <- renderPlotly({
+        dats = pls::RMSEP(plsFit[[1]], estimate="all")
+        df=as.data.frame(t(dats$val[,1,]))
+        df$x=seq_len(dim(df)[1])-1
+        plot_data <- reshape2::melt(df,id.var="x")
+        ggplotly(
+          ggplot2::ggplot(plot_data, ggplot2::aes(x=x,y=value,group=variable,colour=variable))+
+            ggplot2::geom_point(size=4, shape=21, stroke=1.2)+
+            ggplot2::geom_line(ggplot2::aes(lty=variable),lwd=1.2)+
+            ggplot2::xlab("Nb of latent variables") + ggplot2::ylab("RMSE")
+        )
+      })
+    })
+    
+    ## Reacts to plot predictions ----
+    #Retrieve options (factor to apply color or to label)
+    observeEvent(input$PlotPLSPred,{
+      
+      leType <- input$PredPlotTypePLS
+      output$PLSPlotID <-   renderText(paste0("PREDICTION - ",leType))
+      colBy <- input$PLSPredPlotColorBy
+      labelWith <- input$PLSPredPlotLabel
+      pl<-plot(plsFit[[1]],plottype = "prediction",
+                         ncomp=input$NbLVPLS_Sel,
+                         which=leType, type="n")
+      dev.off(dev.list()["RStudioGD"])
+      
+      pl <- as.data.frame(pl)
+      
+      mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
+      
+      output$PLSPlots <-   renderPlotly({
+        plotly::plot_ly() %>%
+        add_markers(data=pl,          #Plot all points
+                    x=as.formula("~measured"),
+                    y=as.formula("~predicted"),
+                    type = "scatter", mode = "markers",
+                    color=as.character(Ys_df[[colBy]]),
+                    colors = mycolors,
+                    size=8,
+                    text=as.character(Ys_df[[labelWith]]),
+                    hovertext=as.character(Ys_df[,1]),
+                    hovertemplate = paste('EchID: %{text}'))
+      })
+      
+    })
+    
+    ## Reacts to B-coeff plot----
+    observeEvent(input$PLSBCoeffPlot,{
+      output$PLSPlotID <-   renderText("B - Coefficients")
+      output$PLSPlots <- renderPlotly({
+      
+        x_id=rownames(plsFit[[1]]$coefficients)
+        x_id=strsplit(x_id,"_")
+        N_xlabels <- length(x_id)
+        x_id=unlist(x_id)
+        x_cls=x_id[seq(1,2*N_xlabels,2)]
+        xlabels=as.numeric(x_id[seq(2,2*N_xlabels,2)])
+        nc=input$NbLVPLS_Sel
+        df=data.frame(y=plsFit[[1]]$coefficients[,1,nc],
+                      Cl=x_cls, 
+                      xlabs=as.numeric(xlabels))
+        
+        ggplotly(
+          ggplot2::ggplot(df, ggplot2::aes(x=xlabs,y=y,colour=Cl))+
+          ggplot2::geom_line() + ggplot2::xlab("Wavelength or Wavenumber") + ggplot2::ylab("B-coefficients") +
+          ggplot2::facet_wrap( ~ Cl, ncol=1, scales="free_y") + ggplot2::theme(legend.position="none") +
+          ggplot2::theme(strip.background = ggplot2::element_rect(fill="grey80"))
+        )
+      })
+    })
+    
+    ## Reacts to Score plot button----
+    observeEvent(input$PLSScorePlot ,{
+      output$PLSPlotID <-   renderText("Score plot")
+      dats <- scores(plsFit[[1]])
+      pl <- data.frame(x=dats[,input$PLSScorePlotFirstLV], y=dats[,input$PLSScorePlotSecondLV])
+      mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
+      colBy <- input$PLSScorePlotColorBy
+      output$PLSPlots <-   renderPlotly({
+        plotly::plot_ly() %>%
+          add_markers(data=pl,          #Plot all points
+                      x=as.formula("~x"),
+                      y=as.formula("~y"),
+                      type = "scatter", mode = "markers",
+                      color=as.character(Ys_df[[colBy]]),
+                      colors = mycolors,
+                      size=8,
+                      text=as.character(Ys_df[,1]),
+                      hovertext=as.character(Ys_df[,1]),
+                      hovertemplate = paste('EchID: %{text}'))
+      })
+    })
+    
+    ## Reacts to ShowPLSPredTable button
+    observeEvent(input$ShowPLSPredTable,{
+    
+      pl<-plot(plsFit[[1]],plottype = "prediction",
+               ncomp=input$NbLVPLS_Sel,
+               which="train")
+      dev.off(dev.list()["RStudioGD"])
+      dat_tbl=as.data.frame(pl)
+      pl<-plot(plsFit[[1]],plottype = "prediction",
+               ncomp=input$NbLVPLS_Sel,
+               which="validation")
+      dat_tbl=cbind(dat_tbl,as.data.frame(pl)[,2])
+      dat_tbl=cbind(Ys_df[,1],dat_tbl,NoSeq=seq_len(nrow(dat_tbl)))
+      colnames(dat_tbl)[c(1,3,4)]=c(colnames(Ys_df)[1],
+                                    "Training","Validation")
+      output$PlsPredTable = renderDataTable( dat_tbl)
+    })
+    
+    ## Reacts to Save button on modal PlsPredTable ----
+    observeEvent(input$savePLSPreds ,{
+      pl<-plot(plsFit[[1]],plottype = "prediction",
+               ncomp=input$NbLVPLS_Sel,
+               which="train")
+      dev.off(dev.list()["RStudioGD"])
+      dat_tbl=as.data.frame(pl)
+      pl<-plot(plsFit[[1]],plottype = "prediction",
+               ncomp=input$NbLVPLS_Sel,
+               which="validation")
+      dat_tbl=cbind(dat_tbl,as.data.frame(pl)[,2])
+      dat_tbl=cbind(Ys_df[,1],dat_tbl,NoSeq=seq_len(nrow(dat_tbl)))
+      colnames(dat_tbl)[c(1,3,4)]=c(colnames(Ys_df)[1],
+                                    "Training","Validation")
+      
+      outfile=choose.files(caption="Define file name",
+                           multi=FALSE, 
+                           filters=Filters[c("txt")])
+      utils::write.table(dat_tbl,
+                         file=outfile,
+                         sep="\t",
+                         dec=".",
+                         row.names = FALSE,
+                         quote=FALSE)
+    })
 
 })

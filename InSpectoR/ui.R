@@ -19,6 +19,7 @@ library(rhandsontable)
 library(reactlog)
 library(ggplot2)
 library(ggthemes)
+library(pls)
 #reactlog_enable()
 
 # Define UI for application that draws a histogram
@@ -191,8 +192,13 @@ shinyUI(fluidPage(
                                                        min=1, max=2, step=1, value=1),
                                            numericInput('PLSScorePlotSecondLV', 'LV on y-axis',
                                                         min=1, max=2, step=1, value=1),
+                                           selectInput("PLSScorePlotColorBy", "Color by",
+                                                       choices=c()),
                                            hr(),
-                                           actionButton('ShowPLSPredTable',"Show prediction table")
+                                           actionButton('ShowPLSPredTable',"Show prediction table"),
+                                           bsModal("PLSPreds", "PLS predictions", "ShowPLSPredTable", size = "large",
+                                                   dataTableOutput("PlsPredTable"),
+                                                   actionButton('savePLSPreds','Save'))
                                            
                                     ),
                                     column(6, offset=2, 
