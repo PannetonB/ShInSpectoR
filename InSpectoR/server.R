@@ -641,7 +641,7 @@ shinyServer(function(input, output, session) {
         isolate({
            updateSelectInput(session,"XsForPLS", choices=input$Xs,
                              selected=input$Xs[1])
-          lesChoix <- names(Filter(is.factor,Ys_df))
+          lesChoix <- names(Filter(function(x) !is.factor(x),Ys_df))
           updateSelectInput(session,"YForPLS",
                             choices = lesChoix ,
                             selected = lesChoix[1])
@@ -651,6 +651,68 @@ shinyServer(function(input, output, session) {
       } 
     })
     
+    observeEvent(input$NbLVForPLS,{
+      nbLVs <- input$NbLVForPLS
+      if (!is.null(nbLVs)){
+        nbSamples <- nrow(Ys_df)
+        maxi <- min(c(20,(nbSamples-1)))
+        if (nbLVs>maxi & maxi>0) {
+         isolate(updateNumericInput(session,"NbLVForPLS",value=maxi))
+        }
+      }
+    })
+    
+    observeEvent(input$ComputePLS,{
+      showNotification("Computing - Be patient!")
+      
+        
+      #collect parameters
+      YName <- input$YForPLS
+      nbLV <- input$NbLVForPLS
+      aggr <- input$AggregateForPLS
+      Y <- Ys_df[[YName]]
+      XNames <- as.list(input$XsForPLS)
+      valid <- input$ResamplingForPLS
+      
+      if (aggr=="Concatenate spectra"){
+        y <- data.frame(V1=Ys_df[[YName]])
+        for (k in XNames){
+          spdf<-as.data.frame(All_XData_p[[k]][-1,-1])
+          pre <- strsplit(k,"_")[[1]][1]
+          colnames(spdf)<-paste(pre,as.character(All_XData_p[[k]][1,-1]),sep="_")
+          y <- cbind(y,spdf)
+        }
+        pls_set <<- list(y)
+      }
+      plsFit <- lapply(pls_set,function(x){
+        pls::plsr(formula= V1~., data=x,
+                  ncomp=nbLV,
+                  validation = valid)
+      })
+      dum<-c()
+      pls_txt_output<-lapply(plsFit,function(x){
+       utils::capture.output(summary(x))
+      })
+      output$PLSConsole <- renderPrint({
+        write(unlist(pls_txt_output),file="")
+      })
+      
+      #Plot
+      output$PLSPlotID <-   renderText("ERROR PLOT")
+      output$PLSPlots <- renderPlotly({
+        dats = pls::RMSEP(plsFit[[1]], estimate="all")
+        df=as.data.frame(t(dats$val[,1,]))
+        df$x=seq_len(dim(df)[1])-1
+        plot_data <- reshape2::melt(df,id.var="x")
+        ggplotly(
+          ggplot2::ggplot(plot_data, ggplot2::aes(x=x,y=value,group=variable,colour=variable))+
+            ggplot2::geom_point(size=4, shape=21, stroke=1.2)+
+            ggplot2::geom_line(ggplot2::aes(lty=variable),lwd=1.2)+
+            ggplot2::xlab("Nb of latent variables") + ggplot2::ylab("RMSE")
+        )
+      })
+      
+    }, ignoreInit = T)
     
 
 })
