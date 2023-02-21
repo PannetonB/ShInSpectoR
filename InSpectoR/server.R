@@ -1,8 +1,6 @@
 #
 #Server for ShInSpectoR
 
-inserted_perSpectrumOptions <<- c()
-
 shinyServer(function(input, output, session) {
   
     
@@ -10,6 +8,8 @@ shinyServer(function(input, output, session) {
     # To make modal window for loading plots draggable ----
     jqui_draggable('#modalExample')
   
+    # *********************************************************************
+    
     #Hide all tabs but Data
     hideTab(inputId = "tabs", target = 'Preprocessing')
     hideTab(inputId = "tabs", target = 'PCA')
@@ -17,6 +17,7 @@ shinyServer(function(input, output, session) {
     hideTab(inputId = "tabs", target = 'PLSDA')
     hideTab(inputId = "tabs", target = 'Apply models')
     
+    # *********************************************************************
     
     # Defines table contents as reactive and create proxys ----
     ## On Data tab ----
@@ -26,6 +27,8 @@ shinyServer(function(input, output, session) {
     })
     proxy_Ys = dataTableProxy('Ys')
     
+    # *********************************************************************
+    
     ## On Prepro tab ----
     PPvaluesTrunc <- reactiveValues(dfWorking = data.frame())
     output$PreProsTrunc <- renderDataTable({
@@ -33,6 +36,13 @@ shinyServer(function(input, output, session) {
     })
 
     proxy_PreProTrunc = dataTableProxy('PreProsTrunc')
+    
+    # *********************************************************************
+    
+    #Placeholder for per spectrum prepro options UI
+    inserted_perSpectrumOptions <<- reactiveVal(c())
+    
+    # *********************************************************************
     
     # On Data tab ----
     ## Shows Y filename. Triggered by input$files ----
@@ -42,8 +52,13 @@ shinyServer(function(input, output, session) {
                 return("None selected")
             }
             indi <- which(stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
+            if (length(indi)==0){
+              return("No valide Y file selected")
+            }
             inFile$name[indi]
         })
+    
+    # *********************************************************************
     
     ## Plot spectra ----
     # Triggered by selection in Ys
@@ -67,7 +82,10 @@ shinyServer(function(input, output, session) {
         }
     })
     
+    # *********************************************************************
+    
     ## Plot PCA ----
+    # Triggered by selection in Ys or changes in npcs, PC1, PC2, pctPtColoyBy, PCA_Data
     output$acpPlots <- renderPlotly({
         s <- unique(input$Ys_rows_selected)
         dum <- input$npcs
@@ -81,7 +99,7 @@ shinyServer(function(input, output, session) {
         lepc1 <- as.formula(paste0("~",input$pc1))
         lepc2 <- as.formula(paste0("~",input$pc2))
         ptColor <- as.formula(paste0("~",input$pcaPtColorBy))
-        dfsPCA <- as.data.frame(PCAs[[lePCA]]$x)
+        dfsPCA <- as.data.frame(PCAsDT[[lePCA]]$x)
         dfsPCA <- cbind(dfsPCA,Ys_df[input$pcaPtColorBy])
         
         ### Something was selected ----
@@ -126,13 +144,13 @@ shinyServer(function(input, output, session) {
             
             # Add confidence limits for SDist and/or ODist
             p <- switch(input$pc1,
-                   SDist = p %>% layout(shapes = list(vline(PCAs_dds_crit[[lePCA]][1]))),
-                   ODist = p %>% layout(shapes = list(vline(PCAs_dds_crit[[lePCA]][2]))),
+                   SDist = p %>% layout(shapes = list(vline(PCAsdt_dds_crit[[lePCA]][1]))),
+                   ODist = p %>% layout(shapes = list(vline(PCAsdt_dds_crit[[lePCA]][2]))),
                    p
             )
             p <- switch(input$pc2,
-                    SDist = p %>% layout(shapes = list(hline(PCAs_dds_crit[[lePCA]][1]))),
-                    ODist = p %>% layout(shapes = list(hline(PCAs_dds_crit[[lePCA]][2]))),
+                    SDist = p %>% layout(shapes = list(hline(PCAsdt_dds_crit[[lePCA]][1]))),
+                    ODist = p %>% layout(shapes = list(hline(PCAsdt_dds_crit[[lePCA]][2]))),
                     p
             )
             
@@ -157,13 +175,13 @@ shinyServer(function(input, output, session) {
           
           # Add confidence limits for SDist and/or ODist
           p <- switch(input$pc1,
-                      SDist = p %>% layout(shapes = list(vline(PCAs_dds_crit[[lePCA]][1]))),
-                      ODist = p %>% layout(shapes = list(vline(PCAs_dds_crit[[lePCA]][2]))),
+                      SDist = p %>% layout(shapes = list(vline(PCAsdt_dds_crit[[lePCA]][1]))),
+                      ODist = p %>% layout(shapes = list(vline(PCAsdt_dds_crit[[lePCA]][2]))),
                       p
           )
           p <- switch(input$pc2,
-                      SDist = p %>% layout(shapes = list(hline(PCAs_dds_crit[[lePCA]][1]))),
-                      ODist = p %>% layout(shapes = list(hline(PCAs_dds_crit[[lePCA]][2]))),
+                      SDist = p %>% layout(shapes = list(hline(PCAsdt_dds_crit[[lePCA]][1]))),
+                      ODist = p %>% layout(shapes = list(hline(PCAsdt_dds_crit[[lePCA]][2]))),
                       p
           )
           
@@ -176,16 +194,18 @@ shinyServer(function(input, output, session) {
           }
     })
     
+    # *********************************************************************
+    
     ## Plot loadings in a modal window ----
     output$loadingPlots <- renderPlotly({
         if (all(stringr::str_detect(c(input$pc1,input$pc2),"PC"))){
-            lePCA <- PCAs[[input$PCA_data]]
-            whichData <- which(input$PCA_data==names(PCAs))
+            lePCA <- PCAsDT[[input$PCA_data]]
+            whichData <- which(input$PCA_data==names(PCAsDT))
             colPC1 <- which(colnames(lePCA$x)==input$pc1)
             colPC2 <- which(colnames(lePCA$x)==input$pc2)
             ys1 <- lePCA$rotation[,colPC1]  #First PC loadings
             ys2 <-lePCA$rotation[,colPC2]  #Second PC loadings
-            xs <- as.numeric(All_XData_p[[whichData]][1,-1])
+            xs <- as.numeric(rownames(lePCA$rotation))
             plotdf <- data.frame(Wavelength=xs, Loadings1=ys1,Loadings2=ys2)
             p1 <- plot_ly(plotdf, x = ~Wavelength, y = ~Loadings1 ,type='scatter',mode="line" ) %>%
                 layout(title = input$PCA_data,
@@ -201,7 +221,8 @@ shinyServer(function(input, output, session) {
         }
     })
     
-   
+    
+    # ********************************************************************* 
    
     ## Toggles Plot Loadings action button ---- 
     # Both pc1 and pc2 inputs must be a principal components for button to show
@@ -209,12 +230,17 @@ shinyServer(function(input, output, session) {
                      condition=all(stringr::str_detect(c(input$pc1,input$pc2),"PC")))})
     
     
+    # *********************************************************************
+    
     ## Loads data ----
     observeEvent(input$files, {
         k=1
         inFile <- input$files
         if (is.null(inFile))
             return(NULL)
+        indi <- which(stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
+        if (length(indi)==0) 
+          return('NULL')
         #Load Y data
         indi <- which(stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
         Ys_df <<- read.table(file=inFile$datapath[indi],header=TRUE,sep="\t",dec=".",
@@ -260,58 +286,7 @@ shinyServer(function(input, output, session) {
         
         #By default, remove Rayleigh and do norm by closure for fluorescence
         #for data visualisation
-        for (jj in 1:length(All_XData)){
-          dats <- All_XData[[jj]]
-          
-          #First find cutoff for Rayleigh
-          #Find excitation wavelength
-          leNom <- names(All_XData)[jj]
-          # Check if this is fluorescence
-          isFluo <- substr(leNom,1,2)=="EX"
-          if (isFluo){
-            #Find excitation wavelength
-            EXwv <- strsplit(leNom,"_")[[1]][1]
-            #ATTN - marche si longueur d'onde d'excitation a 3 chiffres.
-            EXwv <- as.numeric(substr(EXwv,start=3,stop=5))
-            
-            #Find local min between EXwv and EXwv+50
-            #First do some smoothing
-            #Isolate data
-            ind1 <- dats[1,-1] >=EXwv
-            ind2 <- dats[1,-1] <= (EXwv+50)
-            myarray <- dats[-1,c(FALSE,(ind1 & ind2))]
-            #Smooth per line
-            myarray <- apply(myarray,2,function(x) smooth.spline(x)$y)
-            infl <- apply(myarray,2,function(x) c(FALSE,diff(diff(x)>0)!=0))
-            #Find inflection points (1rst derivative changes sign)
-            wvDips <- apply(infl,1, function(x) (EXwv:(EXwv+50))[which(x)[1]])
-            #Find average location of dip for all samples.
-            wvDip <- round(quantile(wvDips,probs=0.9,na.rm=T))
-            #If wvDip too close to EXwv, default do EXwv + 25
-            if (wvDip<(EXwv+10)) wvDip <- wvDip+25
-            
-            #Store to RayleighCutoffs
-            RayleighCutoffs[[leNom]] <<- wvDip
-            
-            #Truncation
-            inTrunc <- dats[1,-1]>wvDip
-            dum <- All_XData[[jj]][,c(TRUE,inTrunc)]
-            dum <- normLigne(dum)
-            All_XData_p[[leNom]] <<-dum  
-            
-            # #Compute PCA on normalized spectra
-            lesChoix <- computePCA(input$npcs, dum, leNom)
-          }
-          else{
-            #normalize matrices by closure by default
-            dum <- normLigne(All_XData[[leNom]])
-            All_XData_p[[leNom]] <<-dum 
-            # #Compute PCA on normalized spectra
-            lesChoix <- computePCA(input$npcs, dum, leNom)
-            #Store dummy to RayleighCutoffs
-            RayleighCutoffs[[leNom]] <<- All_XData[[leNom]][1,2]
-          }
-        }
+        lesChoix <- computePCAonRaw(input$npcs,doRayleigh=TRUE)
         
         #Populate Xs file selection and select first by default
         updateSelectInput(session, "Xs",               
@@ -370,15 +345,12 @@ shinyServer(function(input, output, session) {
     )
     
     
+    # *********************************************************************
+    
     ## Reacts to number of PCs ----
     observeEvent(input$npcs,{
-        for (k in 1:length(All_XData_p)){
-          leNom <- names(All_XData_p)[k]
-          dum <- All_XData_p[[leNom]]
-          dats <- dum[-1,-1]
-          # #Compute PCA on normalized spectra
-          lesChoix <- computePCA(input$npcs, dum, leNom)
-        }
+       
+       lesChoix <- computePCAonRaw(input$npcs,doRayleigh=FALSE)
         #Populate select CPs to plot
         
         updateSelectInput(session,"pc1",
@@ -391,10 +363,12 @@ shinyServer(function(input, output, session) {
     }, ignoreInit = T)
     
     
+    # *********************************************************************
+    
     ## Reacts to X selection ----
     observe({
         XDataList <<- sort(input$Xs)
-        if (length(XDataList>0)){
+        isolate(if (length(XDataList>0)){
           #Update prepro tables 
           #Truncation
           truncDF <- data.frame(
@@ -416,11 +390,11 @@ shinyServer(function(input, output, session) {
           
           #Update per spectrum prepro options
           #Remove all entries in the perSpectrumOptions section
-          for (k in inserted_perSpectrumOptions){
+          for (k in inserted_perSpectrumOptions()){
             id <- k
             removeUI(selector = paste0('#', id))
           }
-          inserted_perSpectrumOptions <<- c()
+          inserted_perSpectrumOptions(c())
           
           #Loop on all selected data types
          
@@ -430,7 +404,7 @@ shinyServer(function(input, output, session) {
             lowWL <- as.numeric(RayleighCutoffs[kk])
             ctr <- round((hiWL+lowWL)/2)
             id <- kk
-            inserted_perSpectrumOptions <<- c(inserted_perSpectrumOptions,id)
+            inserted_perSpectrumOptions(c(inserted_perSpectrumOptions(),id))
             insertUI(
               selector = "#placeholder1",
               where = "beforeEnd",
@@ -463,44 +437,58 @@ shinyServer(function(input, output, session) {
             )
           }
           
-  
-  
+          #Necessary as these values are not yet available!
+          #NOT SURE IF STILL NEEDED BUT WORKS AS IS...
+          if (length(XDataList)>0){
+            dummyInput <- list()
+            for (id in XDataList){
+              unInput <- list("closure",ctr,1,FALSE,5,3,0)
+              names(unInput) <- c(paste(id,LETTERS[1:7],sep="_"))
+              dummyInput <- c(dummyInput,unInput)
+            }
+          }
+          
           
           #Apply default prepro
-          Apply_PrePro(PPvaluesTrunc,input)
+          preproParams <- collectPreProParams(PPvaluesTrunc,dummyInput)
+          Apply_PrePro(preproParams)
+          
           #Force redraw
           isolate(proxy_Ys %>% selectRows(NULL))
-        }
+        })
     })
     
+    
+    # *********************************************************************
     
     ## Reacts to clearRows button ----
     observeEvent(input$clearRows, {
         proxy_Ys %>% selectRows(NULL)
     })
     
+    # *********************************************************************
+    
     ## Reacts to deleteRows button ----
     observeEvent(input$deleteRows, {
         if (!is.null(input$Ys_rows_selected)) {
             lesRows <- unique(as.numeric(input$Ys_rows_selected))
             #Remove rows in All_XData, .
-            #Recompute PCAs and update PCAs, PCAs_dds and PCAs_dds_crit - see lines 180-202 above.
+            #Recompute PCAs and update PCAs, PCAsdt_dds and PCAsdt_dds_crit
             Yvalues$dfWorking$x$data <- Yvalues$dfWorking$x$data[-lesRows,]
             Ys_df <<- Yvalues$dfWorking$x$data
             for (k in 1:length(All_XData)){
                 All_XData[[k]] <<- All_XData[[k]][-(1+lesRows),]
-                All_XData_p[[k]] <<- All_XData_p[[k]][-(1+lesRows),]
-                
-                #COmpute PCA on preprocessed data
-                leNom <- names(All_XData_p)[k]
-                dum <- All_XData_p[[leNom]]
-                dats <- dum[-1,-1]
-                # #Compute PCA on normalized spectra
-                lesChoix <- computePCA(input$npcs, dum, leNom)
             }
+            
+            for (k in 1:length(All_XData_p)){
+              All_XData_p[[k]] <<- All_XData_p[[k]][-(1+lesRows),]
+            }
+            lesChoix <- computePCAonRaw(input$npcs,doRayleigh=FALSE)
         }
         proxy_Ys %>% selectRows(NULL)
     })
+    
+    # *********************************************************************
     
     
     ## Reacts to restoreOriData button ----
@@ -532,18 +520,15 @@ shinyServer(function(input, output, session) {
         for (k in 1:length(All_XData)){
             leNom <- names(All_XData)[k]
             #Truncation
-            wv <- All_XData_p[[leNom]][1,-1]
-            i1 <- which(All_XData[[leNom]][1,-1]==min(wv))
+            wv <- All_XData[[leNom]][1,-1]
+            i1 <- which(All_XData[[leNom]][1,-1]==RayleighCutoffs[leNom])
             i2 <- which(All_XData[[leNom]][1,-1]==max(wv))
-            All_XData_p[[leNom]] <<- All_XData[[leNom]][,1+c(0,i1:i2)]
-            #COmpute PCA on preprocessed data
-            dum <- All_XData_p[[leNom]]
-            dum <- normLigne(All_XData_p[[leNom]])
-            All_XData_p[[leNom]] <<-dum 
-            
-            #Compute PCA on normalized spectra
-            lesChoix <- computePCA(input$npcs, dum, leNom)
+            if (!is.null(All_XData_p[[leNom]])) All_XData_p[[leNom]] <<- All_XData[[leNom]][,1+c(0,i1:i2)]
         }
+        
+        
+        lesChoix <- computePCAonRaw(input$npcs,doRayleigh=FALSE)
+        proxy_Ys %>% selectRows(1)  #Trigger PCA plot refresh
         proxy_Ys %>% selectRows(NULL)
         
         #Populate select CPs to plot
@@ -556,20 +541,24 @@ shinyServer(function(input, output, session) {
         
     })
     
+    # *********************************************************************
+    
     ## Reacts to click on pcaPlot ----
     observeEvent(event_data("plotly_click",source ="pcaPlot"),
                  {
                        d <- event_data("plotly_click",source ="pcaPlot")
                        lePCA <- isolate(input$PCA_data)
-                       dfsPCA <- as.data.frame(PCAs[[lePCA]]$x)
+                       dfsPCA <- as.data.frame(PCAsDT[[lePCA]]$x)
                        xall <- isolate(as.numeric(dfsPCA[input$pc1][,1]))
                        yall <-isolate( as.numeric(dfsPCA[input$pc2][,1]))
-                       laRow <- (myNearPoint(d$x,d$y,xall,yall))
                        choisie <- input$Ys_rows_selected
+                       laRow <- (myNearPoint(d$x,d$y,xall,yall))
                        proxy_Ys %>% selectRows(c(choisie,laRow))
                  },
                  ignoreInit = T
                  )
+    
+    # *********************************************************************
     
     ## Reacts to selection on pcaPlot ----
     observeEvent(event_data("plotly_selected",source ="pcaPlot"),
@@ -578,7 +567,7 @@ shinyServer(function(input, output, session) {
                      # d$x and d$y : corners of selected box
                      # so find all points in a box
                      lePCA <- isolate(input$PCA_data)
-                     dfsPCA <- as.data.frame(PCAs[[lePCA]]$x)
+                     dfsPCA <- as.data.frame(PCAsDT[[lePCA]]$x)
                      xall <- isolate(as.numeric(dfsPCA[input$pc1][,1]))
                      yall <-isolate( as.numeric(dfsPCA[input$pc2][,1]))
                      sels <<- as.data.frame(cbind(d$x,d$y))
@@ -589,9 +578,11 @@ shinyServer(function(input, output, session) {
                  ignoreInit = T
                 )
     
+    # *********************************************************************
+    
     # On PrePro tab ----
     
-    ## Reacts to PrePro editing ----
+    ## Reacts to Trunc_limits editing ----
     observeEvent(input$PreProsTrunc_cell_edit, isolate({
       row  <- input$PreProsTrunc_cell_edit$row
       clmn <- input$PreProsTrunc_cell_edit$col+1
@@ -599,44 +590,64 @@ shinyServer(function(input, output, session) {
       PPvaluesTrunc$dfWorking$x$data[row, clmn] <- laVal
       lowWL <- PPvaluesTrunc$dfWorking$x$data[row, 2]
       hiWL <- PPvaluesTrunc$dfWorking$x$data[row, 3]
-      id <- paste0(inserted_perSpectrumOptions[row],"_C")
+      id <- paste0(inserted_perSpectrumOptions()[row],"_C")
       WBand <- input[[id]]
       ctr <- round((hiWL+lowWL)/2)
       #Update values for ctr and waveband
-      id <- paste0(inserted_perSpectrumOptions[row],"_B")
+      id <- paste0(inserted_perSpectrumOptions()[row],"_B")
       updateNumericInput(session,id,value=ctr,min=lowWL+WBand,max=hiWL-WBand)
 
     }))
     
+    # *********************************************************************
+    
     ## Reacts to Apply on PrePro tab ----
     
     observeEvent(input$applyPrePro,{
-      Apply_PrePro(PPvaluesTrunc,input)
-      #Force redraw
       s <- unique(input$Ys_rows_selected)
+      preproParams <- collectPreProParams(PPvaluesTrunc,input)
+      Apply_PrePro(preproParams)
+      #Force redraw
       proxy_Ys %>% selectRows(NULL)
       proxy_Ys %>% selectRows(s)
     })
     
+    # *********************************************************************
+    
+    ## Dummy observe to refresh per spectrum and SavGol inputs ----
+    observe({
+      outtxt <- character()
+      for (k in inserted_perSpectrumOptions()){
+        outtxt <- paste0(outtxt,k,": ")
+        for (j in LETTERS[1:7])
+          outtxt <- paste(outtxt,
+                          input[[paste(k,j,sep="_")]])
+        outtxt <- paste0(outtxt,"\n")
+      }
+      output$feedback<-renderText(outtxt)
+    })
+    
+    # *********************************************************************
     
     # On PLS tab----
-    ## Init plot and console areas ----
-    output$PLSPlotID <-   renderText("PLOT TYPE ID")
-    output$PLSPlots <- renderPlotly({
-      text = "PLOT OUTPUT AREA"
-      ggplotly(
-        ggplot() + 
-          annotate("text", x = 4, y = 25, size=8, label = text) + 
-          theme_void()
-      )
-    })
+    # ## Init plot and console areas ----
+    # output$PLSPlotID <-   renderText("PLOT TYPE ID")
+    # output$PLSPlots <- renderPlotly({
+    #   text = "PLOT OUTPUT AREA"
+    #   ggplotly(
+    #     ggplot() + 
+    #       annotate("text", x = 4, y = 25, size=8, label = text) + 
+    #       theme_void()
+    #   )
+    # })
+    # 
+    # 
+    # output$PLSConsole <- renderPrint({
+    #   dum <- "Console output area"
+    #   write(dum, file="")
+    # })
     
-    
-    output$PLSConsole <- renderPrint({
-      dum <- "Console output area"
-      write(dum, file="")
-    })
-    
+    # *********************************************************************
     
     ## Reacts to PLS tab activation ----
     observeEvent(input$tabs,{
@@ -671,6 +682,7 @@ shinyServer(function(input, output, session) {
               theme_void()
           )
         })
+        whichPLSPlot <<- "Error"
         output$PLSConsole <- renderPrint({
           dum <- "Console output area"
           write(dum, file="")
@@ -678,6 +690,7 @@ shinyServer(function(input, output, session) {
       } 
     })
     
+    # *********************************************************************
     
     ## Verify in nb LV is within limits ----
     observeEvent(input$NbLVForPLS,{
@@ -686,11 +699,16 @@ shinyServer(function(input, output, session) {
         nbSamples <- nrow(Ys_df)
         maxi <- min(c(20,(nbSamples-1)))
         if (nbLVs>maxi & maxi>0) {
-         isolate(updateNumericInput(session,"NbLVForPLS",value=maxi))
+         isolate({
+           updateNumericInput(session,"NbLVForPLS",value=maxi)
+           updateNumericInput(session,"NbLVPLS_Sel", max = maxi)
+         })
+         
         }
       }
     })
     
+    # *********************************************************************
     
     ##Reacts to Compute button ----
     observeEvent(input$ComputePLS,{
@@ -759,8 +777,11 @@ shinyServer(function(input, output, session) {
       
     }, ignoreInit = T)
     
+    # *********************************************************************
+    
     ## Reacts to plot validation button ----
     observeEvent(input$PLSvalidationPlot,{
+      whichPLSPlot <<- "Error"
       output$PLSPlotID <-   renderText("ERROR PLOT")
       output$PLSPlots <- renderPlotly({
         dats = pls::RMSEP(plsFit[[1]], estimate="all")
@@ -776,72 +797,96 @@ shinyServer(function(input, output, session) {
       })
     })
     
+    # *********************************************************************
+    observeEvent(input$PlotPLSPred,
+                 whichPLSPlot <<- "Pred"
+    )
     ## Reacts to plot predictions ----
     #Retrieve options (factor to apply color or to label)
-    observeEvent(input$PlotPLSPred,{
-      
-      leType <- input$PredPlotTypePLS
-      output$PLSPlotID <-   renderText(paste0("PREDICTION - ",leType))
+    observe({
+      input$PlotPLSPred
+      input$NbLVPLS_Sel
+      input$PredPlotTypePLS
       colBy <- input$PLSPredPlotColorBy
       labelWith <- input$PLSPredPlotLabel
-      pl<-plot(plsFit[[1]],plottype = "prediction",
-                         ncomp=input$NbLVPLS_Sel,
-                         which=leType, type="n")
-      dev.off(dev.list()["RStudioGD"])
-      
-      pl <- as.data.frame(pl)
-      
-      mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
-      
-      output$PLSPlots <-   renderPlotly({
-        plotly::plot_ly() %>%
-        add_markers(data=pl,          #Plot all points
-                    x=as.formula("~measured"),
-                    y=as.formula("~predicted"),
-                    type = "scatter", mode = "markers",
-                    color=as.character(Ys_df[[colBy]]),
-                    colors = mycolors,
-                    size=8,
-                    text=as.character(Ys_df[[labelWith]]),
-                    hovertext=as.character(Ys_df[,1]),
-                    hovertemplate = paste('EchID: %{text}'))
-      })
+      if (whichPLSPlot=="Pred")
+        isolate({
+          nc=input$NbLVPLS_Sel
+          leType <- input$PredPlotTypePLS
+          output$PLSPlotID <-   renderText(paste0("PREDICTION - ",leType))
+          pl<-plot(plsFit[[1]],plottype = "prediction",
+                             ncomp=nc,
+                             which=leType, type="n")
+          dev.off(dev.list()["RStudioGD"])
+          
+          pl <- as.data.frame(pl)
+          
+          mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
+          
+          output$PLSPlots <-   renderPlotly({
+            nc=input$NbLVPLS_Sel
+            plotly::plot_ly() %>%
+            add_markers(data=pl,          #Plot all points
+                        x=as.formula("~measured"),
+                        y=as.formula("~predicted"),
+                        type = "scatter", mode = "markers",
+                        color=as.character(Ys_df[[colBy]]),
+                        colors = mycolors,
+                        size=8,
+                        text=as.character(Ys_df[[labelWith]]),
+                        hovertext=as.character(Ys_df[,1]),
+                        hovertemplate = paste('EchID: %{text}'))
+          })
+        })
       
     })
     
+    # *********************************************************************
+    observeEvent(input$PLSBCoeffPlot,
+                 whichPLSPlot <<- "BCoef"
+    )
     ## Reacts to B-coeff plot----
-    observeEvent(input$PLSBCoeffPlot,{
-      output$PLSPlotID <-   renderText("B - Coefficients")
-      output$PLSPlots <- renderPlotly({
-      
-        x_id=rownames(plsFit[[1]]$coefficients)
-        x_id=strsplit(x_id,"_")
-        N_xlabels <- length(x_id)
-        x_id=unlist(x_id)
-        x_cls=x_id[seq(1,2*N_xlabels,2)]
-        xlabels=as.numeric(x_id[seq(2,2*N_xlabels,2)])
-        nc=input$NbLVPLS_Sel
-        df=data.frame(y=plsFit[[1]]$coefficients[,1,nc],
-                      Cl=x_cls, 
-                      xlabs=as.numeric(xlabels))
-        
-        ggplotly(
-          ggplot2::ggplot(df, ggplot2::aes(x=xlabs,y=y,colour=Cl))+
-          ggplot2::geom_line() + ggplot2::xlab("Wavelength or Wavenumber") + ggplot2::ylab("B-coefficients") +
-          ggplot2::facet_wrap( ~ Cl, ncol=1, scales="free_y") + ggplot2::theme(legend.position="none") +
-          ggplot2::theme(strip.background = ggplot2::element_rect(fill="grey80"))
-        )
-      })
+    observe({
+      input$PLSBCoeffPlot
+      input$NbLVPLS_Sel
+      if (whichPLSPlot=="BCoef")
+        isolate({
+          output$PLSPlotID <-   renderText("B - Coefficients")
+          output$PLSPlots <- renderPlotly({
+          
+            x_id=rownames(plsFit[[1]]$coefficients)
+            x_id=strsplit(x_id,"_")
+            N_xlabels <- length(x_id)
+            x_id=unlist(x_id)
+            x_cls=x_id[seq(1,2*N_xlabels,2)]
+            xlabels=as.numeric(x_id[seq(2,2*N_xlabels,2)])
+            nc=input$NbLVPLS_Sel
+            df=data.frame(y=plsFit[[1]]$coefficients[,1,nc],
+                          Cl=x_cls, 
+                          xlabs=as.numeric(xlabels))
+            
+            ggplotly(
+              ggplot2::ggplot(df, ggplot2::aes(x=xlabs,y=y,colour=Cl))+
+              ggplot2::geom_line() + ggplot2::xlab("Wavelength or Wavenumber") + ggplot2::ylab("B-coefficients") +
+              ggplot2::facet_wrap( ~ Cl, ncol=1, scales="free_y") + ggplot2::theme(legend.position="none") +
+              ggplot2::theme(strip.background = ggplot2::element_rect(fill="grey80"))
+            )
+          })
+        })
     })
+    
+    # *********************************************************************
     
     ## Reacts to Score plot button----
     observeEvent(input$PLSScorePlot ,{
+      whichPLSPlot <<- "Score"
       output$PLSPlotID <-   renderText("Score plot")
       dats <- scores(plsFit[[1]])
       pl <- data.frame(x=dats[,input$PLSScorePlotFirstLV], y=dats[,input$PLSScorePlotSecondLV])
       mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
-      colBy <- input$PLSScorePlotColorBy
+
       output$PLSPlots <-   renderPlotly({
+        colBy <- input$PLSScorePlotColorBy
         plotly::plot_ly() %>%
           add_markers(data=pl,          #Plot all points
                       x=as.formula("~x"),
@@ -855,6 +900,8 @@ shinyServer(function(input, output, session) {
                       hovertemplate = paste('EchID: %{text}'))
       })
     })
+    
+    # *********************************************************************
     
     ## Reacts to ShowPLSPredTable button
     observeEvent(input$ShowPLSPredTable,{
@@ -873,6 +920,8 @@ shinyServer(function(input, output, session) {
                                     "Training","Validation")
       output$PlsPredTable = renderDataTable( dat_tbl)
     })
+    
+    # *********************************************************************
     
     ## Reacts to Save button on modal PlsPredTable ----
     observeEvent(input$savePLSPreds ,{

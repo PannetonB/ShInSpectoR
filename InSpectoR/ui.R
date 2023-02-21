@@ -125,7 +125,9 @@ shinyUI(fluidPage(
                         actionButton("applyPrePro","Apply"),
                         actionButton("savePrePro", "Save"),
                         actionButton("loadPrePro", "Load"),
-                        hr()
+                        hr(),
+                        h4('Per spectrum option feedback'),
+                        verbatimTextOutput('feedback',placeholder = T)
                ),
                
                
