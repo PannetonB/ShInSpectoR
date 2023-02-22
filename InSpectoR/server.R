@@ -19,6 +19,7 @@ shinyServer(function(input, output, session) {
     
     # *********************************************************************
     
+    
     # Defines table contents as reactive and create proxys ----
     ## On Data tab ----
     Yvalues <- reactiveValues(dfWorking = Ys_df)
@@ -55,6 +56,9 @@ shinyServer(function(input, output, session) {
             if (length(indi)==0){
               return("No valide Y file selected")
             }
+            indi2 <- which(!stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
+            if (length(indi2)==0) 
+              return('No spectra file selected')
             inFile$name[indi]
         })
     
@@ -239,6 +243,9 @@ shinyServer(function(input, output, session) {
         if (is.null(inFile))
             return(NULL)
         indi <- which(stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
+        if (length(indi)==0) 
+          return('NULL')
+        indi <- which(!stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
         if (length(indi)==0) 
           return('NULL')
         #Load Y data
@@ -453,6 +460,7 @@ shinyServer(function(input, output, session) {
           preproParams <- collectPreProParams(PPvaluesTrunc,dummyInput)
           Apply_PrePro(preproParams)
           
+          
           #Force redraw
           isolate(proxy_Ys %>% selectRows(NULL))
         })
@@ -583,10 +591,17 @@ shinyServer(function(input, output, session) {
     # On PrePro tab ----
     
     ## Reacts to Trunc_limits editing ----
-    observeEvent(input$PreProsTrunc_cell_edit, isolate({
+    observeEvent(input$PreProsTrunc_cell_edit,{
       row  <- input$PreProsTrunc_cell_edit$row
       clmn <- input$PreProsTrunc_cell_edit$col+1
       laVal <- as.numeric(input$PreProsTrunc_cell_edit$value)
+      # First make sure it is within limits of the raw spectra
+      wvLimits <- range(All_XData_p[[row]][1,-1])
+      if (!between(laVal,wvLimits[1],wvLimits[2])){ #not in limit
+        laVal <- PPvaluesTrunc$dfWorking$x$data[row, clmn]
+      }
+
+      # Check waveband norm. parameters and update
       PPvaluesTrunc$dfWorking$x$data[row, clmn] <- laVal
       lowWL <- PPvaluesTrunc$dfWorking$x$data[row, 2]
       hiWL <- PPvaluesTrunc$dfWorking$x$data[row, 3]
@@ -596,8 +611,11 @@ shinyServer(function(input, output, session) {
       #Update values for ctr and waveband
       id <- paste0(inserted_perSpectrumOptions()[row],"_B")
       updateNumericInput(session,id,value=ctr,min=lowWL+WBand,max=hiWL-WBand)
+      output$PreProsTrunc <- renderDataTable({
+        PPvaluesTrunc$dfWorking
+      })
 
-    }))
+    })
     
     # *********************************************************************
     
@@ -614,41 +632,109 @@ shinyServer(function(input, output, session) {
     
     # *********************************************************************
     
-    ## Dummy observe to refresh per spectrum and SavGol inputs ----
+    ## Check inputs and refresh per spectrum and SavGol inputs ----
     observe({
       outtxt <- character()
       for (k in inserted_perSpectrumOptions()){
+        ctr <- input[[paste(k,"B",sep="_")]]
+        req(ctr, cancelOutput = TRUE)
+        # Check to set centre within limits
+        # centre is "_B", waveband is "_C"
+        isolate(wb <-  input[[paste(k,"C",sep="_")]])
+        lo <- PPvaluesTrunc$dfWorking$x$data[k,2]
+        hi <- PPvaluesTrunc$dfWorking$x$data[k,3]
+        wb2 <- floor(wb/2)
+        loctr <- lo+wb2
+        hictr <- hi-wb2
+        updateNumericInput(session,paste(k,"B",sep="_"),min=loctr,max=hictr)
         outtxt <- paste0(outtxt,k,": ")
         for (j in LETTERS[1:7])
           outtxt <- paste(outtxt,
                           input[[paste(k,j,sep="_")]])
         outtxt <- paste0(outtxt,"\n")
+        
+        if (ctr<loctr) updateNumericInput(session,paste(k,"B",sep="_"),value=loctr)
+        if (ctr>hictr) updateNumericInput(session,paste(k,"B",sep="_"),value=hictr)
+        
       }
       output$feedback<-renderText(outtxt)
     })
     
     # *********************************************************************
     
-    # On PLS tab----
-    # ## Init plot and console areas ----
-    # output$PLSPlotID <-   renderText("PLOT TYPE ID")
-    # output$PLSPlots <- renderPlotly({
-    #   text = "PLOT OUTPUT AREA"
-    #   ggplotly(
-    #     ggplot() + 
-    #       annotate("text", x = 4, y = 25, size=8, label = text) + 
-    #       theme_void()
-    #   )
-    # })
-    # 
-    # 
-    # output$PLSConsole <- renderPrint({
-    #   dum <- "Console output area"
-    #   write(dum, file="")
-    # })
+    ## Reacts to save prepro button ----
+    observe({
+      volumes <- c("UserFolder"=fs::path_home())
+      shinyFileSave(input, "FSavePrePro", roots=volumes, session=session)
+      fileinfo <- parseSavePath(volumes, input$FSavePrePro)
+      if (nrow(fileinfo) > 0) {
+        leFichier <- fileinfo$datapath
+        PP_params <- collectPreProParams(PPvaluesTrunc,input)
+        save(PP_params,file=leFichier)
+      }
+    })
     
     # *********************************************************************
     
+    ## Reacts to load prepro button ----
+    observe({
+      volumes <- c("UserFolder"=fs::path_home())
+      shinyFileChoose(input, "FLoadPrePro", roots=volumes, session=session)
+      fileinfo <<- parseFilePaths(volumes, input$FLoadPrePro)
+      if (nrow(fileinfo) > 0){
+        leFichier <- fileinfo$datapath
+        dum <- load(file=leFichier)   #in dum (character vector ), PP_params is the name of the list for ShInSpectoR
+                                      # For InSpectoR dum = c("model_descript","prepro_params")
+        # check if from InSpectoR
+        if (dum[1]=="model_descript"){  #TRUE=InSpectoR, build PP_params
+          PP_params <- list()
+          PP_params$lesNoms <- model_descript$datatype
+          i <- 0
+          for (id in PP_params$lesNoms){
+            i <- i+1
+            PP_params$trunc_limits$lo <- prepro_params$trunc_limits[,1]
+            PP_params$trunc_limits$hi <- prepro_params$trunc_limits[,2]
+            PP_params$perSpecParams[[id]][1] <- 
+                 c("none", "waveband", "closure")[prepro_params$byspectra_scaling_index[i]]
+            PP_params$perSpecParams[[id]][2] <- as.character(prepro_params$cntr_n_w[i,1])
+            PP_params$perSpecParams[[id]][3] <- as.character(prepro_params$cntr_n_w[i,2])
+            PP_params$savgolParams$doSavGol[[id]] <- prepro_params$do_savgol[i]
+            PP_params$savgolParams$w[[id]] <- prepro_params$w[i]
+            PP_params$savgolParams$p[[id]] <- prepro_params$p[i]
+            PP_params$savgolParams$m[[id]] <- prepro_params$m[i]
+          }
+        }
+        
+        #Check spectrum types
+        if (!all(XDataList == PP_params$lesNoms)){   #spectrum types do not match
+          showModal(modalDialog(
+            title = "WARNING",
+            "Selected spectrum types do not match!"
+          ))
+        }else
+        {
+          #Load truncation limits
+          isolate(PPvaluesTrunc$dfWorking$x$data[,2:3] <- PP_params$trunc_limits[,1:2])
+          
+          #update per spectrum and SavGol options
+          for (k in inserted_perSpectrumOptions()){
+            for (id in PP_params$lesNoms){
+              updateRadioButtons(session, paste0(id,"_A"), selected = PP_params$perSpecParams[[id]][1]) 
+              updateNumericInput(session, paste0(id,"_B"), value = PP_params$perSpecParams[[id]][2])
+              updateNumericInput(session, paste0(id,"_C"), value = PP_params$perSpecParams[[id]][3])
+              updateCheckboxInput(session, paste0(id,"_D"), value = PP_params$savgolParams$doSavGol[[id]])
+              updateNumericInput(session, paste0(id,'_E'), value = PP_params$savgolParams$w[[id]])
+              updateNumericInput(session, paste0(id,'_F'), value = PP_params$savgolParams$p[[id]])
+              updateNumericInput(session, paste0(id,'_G'), value = PP_params$savgolParams$m[[id]])
+            }
+          }
+        }
+      }
+    })
+    
+    # *********************************************************************
+   
+    # PLS tab ----
     ## Reacts to PLS tab activation ----
     observeEvent(input$tabs,{
       if(input$tabs == "PLS"){ #set up the pages

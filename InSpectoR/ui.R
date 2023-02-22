@@ -11,6 +11,7 @@
 library(shiny)
 library(shinyjs)
 library(shinyBS)
+library(shinyFiles)
 library(DT)
 library(plotly)
 library(dplyr)
@@ -123,8 +124,13 @@ shinyUI(fluidPage(
                         hr(),
                         h3("Action buttons"),
                         actionButton("applyPrePro","Apply"),
-                        actionButton("savePrePro", "Save"),
-                        actionButton("loadPrePro", "Load"),
+                        shinySaveButton("FSavePrePro", "Save file", "Save file as ...", 
+                                        filetype=list(RData="RData")),
+                        shinyFilesButton("FLoadPrePro","Load",
+                                         "Select a preprocessing parameter file",
+                                         multiple = F,
+                                         filetype=list(RData="RData")),
+                        # actionButton("loadPrePro", "Load"),
                         hr(),
                         h4('Per spectrum option feedback'),
                         verbatimTextOutput('feedback',placeholder = T)
