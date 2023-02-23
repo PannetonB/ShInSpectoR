@@ -21,7 +21,7 @@ library(reactlog)
 library(ggplot2)
 library(ggthemes)
 library(pls)
-#reactlog_enable()
+reactlog_enable()
 
 # Define UI for application that draws a histogram
 
@@ -138,7 +138,47 @@ shinyUI(fluidPage(
                
                
                ### PCA tab ----
-               tabPanel("PCA"),
+               tabPanel("PCA",
+                        sidebarLayout(
+                          sidebarPanel(width=3,
+                                       h4(strong('Data options - spectra are concatenated')),
+                                       selectInput('XsforPCA','Spectrum types for PCA',
+                                                   choices=character(0L),multiple=T),
+                                       sliderInput("NPCsforPCA", "Select number of PCs",
+                                                   min = 1, max=2, step=1, value=1),
+                                       hr(),
+                                       h4(strong('Plotting options')),
+                                       selectInput('PCATopPlotType','Choose plot type',
+                                                   choices = c('Scores','Loadings','Screeplot','OD_SD'),
+                                                   selected = 'Screeplot'),
+                                       selectInput('XAxisPCAPlot','Pick PC for X-axis score plot or 1rst loading',
+                                                   choices = paste0("PC",c(1:2)),
+                                                   selected="PC1"),
+                                       selectInput('YAxisPCAPlot','Pick PC for Y-axis score plot or 1rst loading',
+                                                   choices = paste0("PC",c(1:2)),
+                                                   selected="PC2"),
+                                       selectInput("PCAPlotColorBy", "Color by",
+                                                   choices=c()),
+                                       hr(),
+                                       h4(strong('Saving results')),
+                                       shinySaveButton("PCAScoresSave", strong("Save Scores"),
+                                                       "Define file name", 
+                                                       filetype=list(txt = "txt")),
+                                       shinySaveButton("PCAModelSave", strong("Save model"),
+                                                       "Define file name", 
+                                                       filetype=list(RData = "RDATA")),
+                                       h4(strong('Infos for saving PCA model')),
+                                       textAreaInput('PCADescript', "Short description", 
+                                                     value="Description",
+                                                     width="300px", height="150px")
+                                       
+                                       ),
+                          mainPanel(width=9,
+                                    plotlyOutput("PCATopPlot", 
+                                                 height="800px",
+                                                 width="auto"
+                                    ),)
+                        )),
                
                ### PLSDA tab ----
                tabPanel("PLSDA"),
@@ -165,14 +205,20 @@ shinyUI(fluidPage(
                                                                   min=1, max=25, step=1, value=5),
                                                       hr(),
                                                       selectInput("AggregateForPLS","Aggregation method",
-                                                                 choices=c('Concatenate spectra','Average predictions'),
+                                                                 choices=c('Concatenate spectra'),
                                                                  selected = 'Concatenate spectra')
                                          ),
                                           mainPanel(width=0)
                                       ),
                                       hr(),
                                       actionButton('ComputePLS',strong("Compute model")),
-                                      actionButton('SavePLS',strong('Save model'))
+                                      shinySaveButton("FSavePLS", strong("Save model"),
+                                                      "Save PLS model to file", 
+                                                      filetype=list(RData="RData")),
+                                      h4(strong('Infos for saving PLS model')),
+                                      textAreaInput('PLSDescript', "Short description", 
+                                                    value="Description",
+                                                    width="300px", height="150px")
                           ),
                           
                           

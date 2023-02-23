@@ -17,6 +17,9 @@ shinyServer(function(input, output, session) {
     hideTab(inputId = "tabs", target = 'PLSDA')
     hideTab(inputId = "tabs", target = 'Apply models')
     
+    #Hide some UI elements
+    shinyjs::hide("PLSDescript")
+    shinyjs::hide("FSavePLS")
     # *********************************************************************
     
     
@@ -291,9 +294,7 @@ shinyServer(function(input, output, session) {
         maxnCP <- ifelse (nSamples < 21, nSamples-1, 20 )
         updateSliderInput(session,"npcs",max=maxnCP,value=5)
         
-        #By default, remove Rayleigh and do norm by closure for fluorescence
-        #for data visualisation
-        lesChoix <- computePCAonRaw(input$npcs,doRayleigh=TRUE)
+        lesChoix <- computePCAonRaw(input$npcs,doRayleigh = TRUE)
         
         #Populate Xs file selection and select first by default
         updateSelectInput(session, "Xs",               
@@ -306,6 +307,11 @@ shinyServer(function(input, output, session) {
                           choices=inFile$name[indi],
                           selected=inFile$name[indi][1])
         
+        
+        updateSelectInput(session,"pcaPtColorBy",
+                          choices=names(Filter(is.factor,Ys_df))[-1])
+        
+          
         #Populate select CPs to plot
         updateSelectInput(session,"pc1",
                           choices = lesChoix,
@@ -313,9 +319,7 @@ shinyServer(function(input, output, session) {
         updateSelectInput(session,"pc2",
                           choices = lesChoix,
                           selected="ODist")
-        updateSelectInput(session,"pcaPtColorBy",
-                          choices=names(Filter(is.factor,Ys_df))[-1])
-        
+       
         
         #Table of Ys
         dtable <- DT::datatable(Ys_df, width = '900px',
@@ -347,6 +351,7 @@ shinyServer(function(input, output, session) {
         showTab(inputId = "tabs", target = 'PLSDA')
         showTab(inputId = "tabs", target = 'Apply models')
         
+    
         },
         ignoreInit = T
     )
@@ -358,8 +363,8 @@ shinyServer(function(input, output, session) {
     observeEvent(input$npcs,{
        
        lesChoix <- computePCAonRaw(input$npcs,doRayleigh=FALSE)
+       
         #Populate select CPs to plot
-        
         updateSelectInput(session,"pc1",
                           choices = lesChoix,
                           selected="SDist")
@@ -459,7 +464,8 @@ shinyServer(function(input, output, session) {
           #Apply default prepro
           preproParams <- collectPreProParams(PPvaluesTrunc,dummyInput)
           Apply_PrePro(preproParams)
-          
+          lesChoix <- computePCAonRaw(input$npcs,doRayleigh = TRUE)
+
           
           #Force redraw
           isolate(proxy_Ys %>% selectRows(NULL))
@@ -749,15 +755,20 @@ shinyServer(function(input, output, session) {
           updateNumericInput(session,"NbLVForPLS",max=min(c((nSamples-1),20)))
           lesChoix <- names(Filter(function(x) is.factor(x),Ys_df))
           updateSelectInput(session,"PLSPredPlotColorBy",
-                            choices = lesChoix ,
-                            selected = lesChoix[1])
+                            choices = lesChoix[-1])
           
           updateSelectInput(session,"PLSPredPlotLabel",
                             choices = lesChoix ,
                             selected = lesChoix[1])
           updateSelectInput(session,"PLSScorePlotColorBy",
-                            choices = lesChoix ,
-                            selected = lesChoix[1])
+                            choices = lesChoix[-1])
+          
+          
+          #Perform pre-processing so All_XData_p is inline with prepro options
+          #Useful in case user did not Apply prepros
+          preproParams <- collectPreProParams(PPvaluesTrunc,input)
+          Apply_PrePro(preproParams)
+          
           })
         output$PLSPlotID <-   renderText("PLOT TYPE ID")
         output$PLSPlots <- renderPlotly({
@@ -767,18 +778,25 @@ shinyServer(function(input, output, session) {
               annotate("text", x = 4, y = 25, size=8, label = text) + 
               theme_void()
           )
+          
         })
         whichPLSPlot <<- "Error"
         output$PLSConsole <- renderPrint({
           dum <- "Console output area"
           write(dum, file="")
         })
-      } 
+      }
+      
+      
+      
+      shinyjs::hide("PLSDescript")
+      shinyjs::hide("FSavePLS")
+      
     })
     
     # *********************************************************************
     
-    ## Verify in nb LV is within limits ----
+    ## Verify in nb LV for computing is within limits ----
     observeEvent(input$NbLVForPLS,{
       nbLVs <- input$NbLVForPLS
       if (!is.null(nbLVs) & !is.na(nbLVs)){
@@ -790,6 +808,19 @@ shinyServer(function(input, output, session) {
            updateNumericInput(session,"NbLVPLS_Sel", max = maxi)
          })
          
+        }
+      }
+    })
+    
+    # *********************************************************************
+    
+    ## Verify in nb LV for assessing is within limits ----
+    observeEvent(input$NbLVPLS_Sel,{
+      nbLVs <- input$NbLVPLS_Sel
+      if (!is.null(nbLVs) & !is.na(nbLVs)){
+        maxi <- input$NbLVForPLS
+        if (nbLVs>maxi) {
+          updateNumericInput(session,"NbLVPLS_Sel", value = maxi)
         }
       }
     })
@@ -860,8 +891,48 @@ shinyServer(function(input, output, session) {
             ggplot2::xlab("Nb of latent variables") + ggplot2::ylab("RMSE")
         )
       })
+      shinyjs::show("PLSDescript")    
+      shinyjs::show("FSavePLS")
+
       
     }, ignoreInit = T)
+    
+    # *********************************************************************
+    
+    ## Reacts to save PLS model button ----
+    observe({
+      volumes <- c("UserFolder"=fs::path_home())
+      shinyFileSave(input, "FSavePLS", roots=volumes, session=session)
+      fileinfo <- parseSavePath(volumes, input$FSavePLS)
+      if (nrow(fileinfo) > 0) {
+        leFichier <- fileinfo$datapath
+        PP_params <- collectPreProParams(PPvaluesTrunc,input)
+        
+        #Need to remove some as not all XDataList members are in XsForPLS
+        toRemove <- setdiff(PP_params$lesNoms,input$XsForPLS)
+        removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
+        PP_params$lesNoms <- as.list(input$XsForPLS)
+        i <- 0
+        lapply(toRemove, function(id){
+          i <<- i+1
+          PP_params$trunc_limits <<- PP_params$trunc_limits[-removeInd[i],]
+          PP_params$perSpecParams[[id]] <<- NULL
+          PP_params$savgolParams$doSavGol[[id]] <<- NULL
+          PP_params$savgolParams$w[[id]] <<- NULL
+          PP_params$savgolParams$p[[id]] <<- NULL
+          PP_params$savgolParams$m[[id]] <<- NULL
+        })
+        model_descript <- list(
+          type = "PLS",
+          description = input$PLSDescript,
+          datatype = input$XsForPLS,
+          aggregation = input$AggregateForPLS
+        )
+        pls_ncomp <- input$NbLVPLS_Sel
+        colorby <- input$PLSPredPlotColorBy
+        save(model_descript,PP_params,plsFit,pls_ncomp,colorby,file=leFichier) 
+      }
+    })
     
     # *********************************************************************
     
@@ -884,11 +955,12 @@ shinyServer(function(input, output, session) {
     })
     
     # *********************************************************************
+    
+    ## Reacts to plot predictions ----
+    #Retrieve options (factor to apply color or to label)
     observeEvent(input$PlotPLSPred,
                  whichPLSPlot <<- "Pred"
     )
-    ## Reacts to plot predictions ----
-    #Retrieve options (factor to apply color or to label)
     observe({
       input$PlotPLSPred
       input$NbLVPLS_Sel
@@ -898,6 +970,7 @@ shinyServer(function(input, output, session) {
       if (whichPLSPlot=="Pred")
         isolate({
           nc=input$NbLVPLS_Sel
+          nc <- min(nc,input$NbLVForPLS)
           leType <- input$PredPlotTypePLS
           output$PLSPlotID <-   renderText(paste0("PREDICTION - ",leType))
           pl<-plot(plsFit[[1]],plottype = "prediction",
@@ -947,6 +1020,7 @@ shinyServer(function(input, output, session) {
             x_cls=x_id[seq(1,2*N_xlabels,2)]
             xlabels=as.numeric(x_id[seq(2,2*N_xlabels,2)])
             nc=input$NbLVPLS_Sel
+            nc <- min(nc,input$NbLVForPLS)
             df=data.frame(y=plsFit[[1]]$coefficients[,1,nc],
                           Cl=x_cls, 
                           xlabs=as.numeric(xlabels))
@@ -1034,5 +1108,224 @@ shinyServer(function(input, output, session) {
                          row.names = FALSE,
                          quote=FALSE)
     })
+  # PCA tab ----
+    
+    # *********************************************************************
+    
+    ## Reacts to PCA tab activation ----
+    observeEvent(input$tabs,{
+      if(input$tabs == "PCA"){ #set up the pages
+        isolate({
+          updateSelectInput(session,"XsforPCA", choices=input$Xs,
+                            selected=input$Xs[1])
+          nSamples <- nrow(Ys_df)
+          lesChoix <- names(Filter(function(x) is.factor(x),Ys_df))[-1]
+          updateSelectInput(session,"PCAPlotColorBy",
+                            choices = lesChoix ,
+                            selected = lesChoix[1])
+          
+          
+          #Perform pre-processing so All_XData_p is inline with prepro options
+          #Useful in case user did not Apply prepros
+          preproParams <- collectPreProParams(PPvaluesTrunc,input)
+          Apply_PrePro(preproParams)
+          
+          #Computes PCA on first spectrum in input$X to start with
+          doPCA(All_XData_p[[input$Xs[1]]])
+          
+          updateSelectInput(session, 'PCATopPlotType',
+                              selected = 'Screeplot')
+          updateSliderInput(session, "NPCsforPCA", max=lePCA_NCPs)
+          updateSelectInput(session, "XAxisPCAPlot", 
+                            choices = paste0("PC",(1:lePCA_NCPs)))
+          updateSelectInput(session, "YAxisPCAPlot",
+                            choices = paste0("PC",(1:lePCA_NCPs)),
+                            selected = "PC2")
+          
+        })
+        #trigger plots
+        input$XAxisPCAPlot
+      }
+      
+    })
+    
+    # *********************************************************************
+    ## Plot PCA ----
+    output$PCATopPlot <- renderPlotly({
+      req(input$XsforPCA, input$pcaPtColorBy)
+      mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
+      
+      lepc1 <- as.formula(paste0("~",input$XAxisPCAPlot))
+      lepc2 <- as.formula(paste0("~",input$YAxisPCAPlot))
+      ptColor <- as.formula(paste0("~",input$PCAPlotColorBy))
+      dfsPCA <- as.data.frame(lePCA$x)
+      dfsPCA <- cbind(dfsPCA,Ys_df[input$PCAPlotColorBy])
+     
+      
+      switch(input$PCATopPlotType,
+             Scores = {
+                   plotly::plot_ly() %>%
+                   add_markers(data=dfsPCA,          #Plot all points
+                               x=lepc1, y=lepc2,
+                               type = "scatter", mode = "markers",
+                               color=ptColor,
+                               colors = mycolors,
+                               size=8,
+                               text=as.character(Ys_df[[1]]),
+                               hovertemplate = paste('EchID: %{text}'),
+                               )
+             },
+             Loadings = {
+               xs <- rownames(lePCA$rotation)
+               x_id=strsplit(xs,"_")
+               N_xlabels <- length(x_id)
+               x_id=unlist(x_id)
+               x_cls=x_id[seq(1,2*N_xlabels,2)]
+               xlabels=as.numeric(x_id[seq(2,2*N_xlabels,2)])
+               colonnes <- colnames(lePCA$rotation)
+               col1 <- which(input$XAxisPCAPlot == colonnes)
+               col2 <- which(input$YAxisPCAPlot == colonnes)
+               df=data.frame(y=lePCA$rotation[,col1],
+                             Cl=x_cls, 
+                             xlabs=as.numeric(xlabels),
+                             PC = paste0('PC',col1))
+               if (col2>col1) for (k in (col1+1):col2){
+                 df=rbind(df,data.frame(y=lePCA$rotation[,k],
+                               Cl=x_cls, 
+                               xlabs=as.numeric(xlabels),
+                               PC=paste0("PC",k)))
+               }
+               ncols <- col2-col1+1
+               
+               ggplotly(
+                 ggplot2::ggplot(df, ggplot2::aes(x=xlabs,y=y,colour=Cl))+
+                   ggplot2::geom_line() + ggplot2::xlab("Wavelength or Wavenumber") + ggplot2::ylab("Loadings") +
+                   ggplot2::facet_grid(PC ~ Cl, scales="free_y") + ggplot2::theme(legend.position="none") +
+                   ggplot2::theme(strip.background = ggplot2::element_rect(fill="grey80"))
+               )
+             },
+             Screeplot = {
+               df <- data.frame(PC=1:lePCA_NCPs,
+                                VarExp=PCA_var_explained[1:lePCA_NCPs])
+               ggplotly(
+                 ggplot2::ggplot(data=df, aes(x=PC, y=VarExp)) +
+                   ggplot2::geom_line(color="blue")+
+                   ggplot2::ylab("Fraction of variance explained")+
+                   ggplot2::xlab("Principal component")
+               )
 
+             },
+             OD_SD = {
+               pca2<-pr_2_prin(lePCA)
+               dd <- chemometrics::pcaDiagplot(dat_4_PCA,pca2,a=input$NPCsforPCA,
+                                               plot=FALSE,scale=FALSE)
+               df <- data.frame(Score=dd$SDist,Outside=dd$ODist)
+               df <- cbind(df,Ys_df[input$PCAPlotColorBy])
+               plotly::plot_ly() %>%
+                 add_markers(data=df,          #Plot all points
+                             x=as.formula(" ~ Score"),
+                             y=as.formula(" ~ Outside"),
+                             type = "scatter", mode = "markers",
+                             color=ptColor,
+                             colors = mycolors,
+                             size=8,
+                             text=as.character(Ys_df[[1]]),
+                             hovertemplate = paste('EchID: %{text}'),
+                 )
+
+             }
+       )
+      
+    })
+    
+    # *********************************************************************
+    ## Reacts to XsforPCA ----
+    observe({
+      req(input$XsforPCA)
+      y <- NULL
+      for (k in input$XsforPCA){
+        spdf<-as.data.frame(All_XData_p[[k]][,-1])
+        pre <- strsplit(k,"_")[[1]][1]
+        colnames(spdf)<-paste(pre,as.character(All_XData_p[[k]][1,-1]),sep="_")
+        if (is.null(y)){
+          y <- spdf
+        }else
+        {
+          y <- cbind(y,spdf)
+        }
+      }
+      y <- cbind(data.frame(ID=c("ID",Ys_df[[1]])),y)
+      doPCA(y)
+      updateSliderInput(session, input$NPCsforPCA, max=lePCA_NCPs)
+      updateSelectInput(session, input$XAxisPCAPlot, 
+                        choices = as.character(1:lePCA_NCPs))
+      updateSelectInput(session, input$YAxisPCAPlot,
+                        choices=as.character(1:lePCA_NCPs))
+      #trigger plots
+      input$XAxisPCAPlot
+    })
+    
+    # *********************************************************************
+    ## Reacts to Save scores ----
+    observe({
+      volumes <- c("UserFolder"=fs::path_home())
+      shinyFileSave(input, "PCAScoresSave", roots=volumes, session=session)
+      fileinfo <- parseSavePath(volumes, input$PCAScoresSave)
+      if (nrow(fileinfo) > 0) {
+        scores<-lePCA$x[,1:input$NPCsforPCA]
+        row.names(scores)=Ys_df[,1]  #Put sample IDs as row names.
+        #Define column names
+        shortNames <- lapply(strsplit(input$XsforPCA,"_"), function(x) x[1])
+        pre <- paste(unlist(shortNames),collapse="_")
+        colonnes <- paste(pre,paste0("PC",1:input$NPCsforPCA),sep="_")
+        utils::write.table(scores,file=fileinfo$datapath,sep="\t")
+      }
+    })
+    
+    
+    
+    # *********************************************************************
+    ## Reacts to Save model ----
+    observe({
+      volumes <- c("UserFolder"=fs::path_home())
+      shinyFileSave(input, "PCAModelSave", roots=volumes, session=session)
+      fileinfo <- parseSavePath(volumes, input$PCAModelSave)
+      if (nrow(fileinfo) > 0){
+        shortNames <- lapply(strsplit(input$XsforPCA,"_"), function(x) x[1])
+        model_descript=list(type="PCA",
+                            description=input$PCADescript,
+                            datatype=shortNames)
+        colorby<-Ys_df[,input$PCAPlotColorBy]
+        #Add distances to model output
+        #pr_2_prin is for converting prcomp output to princomp output
+        pca2<-pr_2_prin(lePCA)
+        #Compute score and orthogonal distances
+        dds <- chemometrics::pcaDiagplot(dat_4_PCA,
+                                    pca2,a=input$NPCsforPCA,
+                                    plot=FALSE,scale=FALSE)
+          
+        PP_params <- collectPreProParams(PPvaluesTrunc,input)
+        
+        toRemove <- setdiff(PP_params$lesNoms,input$XsforPCA)
+        removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
+        PP_params$lesNoms <- as.list(input$XsForPLS)
+        i <- 0
+        lapply(toRemove, function(id){
+          i <<- i+1
+          PP_params$trunc_limits <<- PP_params$trunc_limits[-removeInd[i],]
+          PP_params$perSpecParams[[id]] <<- NULL
+          PP_params$savgolParams$doSavGol[[id]] <<- NULL
+          PP_params$savgolParams$w[[id]] <<- NULL
+          PP_params$savgolParams$p[[id]] <<- NULL
+          PP_params$savgolParams$m[[id]] <<- NULL
+        })
+        NCPs <- input$NPCsforPCA
+        save(model_descript,PP_params,lePCA,NCPs,dds,colorby,
+             file=fileinfo$datapath)
+      }
+    })
+    
 })
+      
+    
+    

@@ -187,6 +187,7 @@ computePCAonRaw <- function(nCP, doRayleigh=FALSE)
   # nCP: number of PC desired
   # doRayleigh : when TRUE, calculates Rayleigh cutoffs.
 {
+  
   for (jj in 1:length(All_XData)){
     dats <- All_XData[[jj]]
     
@@ -246,6 +247,15 @@ computePCAonRaw <- function(nCP, doRayleigh=FALSE)
 }
 
 #***********************************************************************
+
+doPCA <- function(dats){
+  thr=0.01
+  dat_4_PCA <<- dats[-1,-1]
+  lePCA <<- prcomp(dat_4_PCA,tol=thr)
+  lePCA_NCPs <<-ncol(lePCA$rotation)
+  PCA_var_explained <<- summary(lePCA)$importance[2,]
+}
+
 
 normLigne <- function(dum)
     # dum: an element of All_XData_p
