@@ -23,7 +23,7 @@ mesCouleurs <- paletteer::paletteer_d("Polychrome::palette36")
 
 
 #***********************************************************************
-#*
+
 
 collectPreProParams <- function(PPValuesTrunc,input){
   
@@ -217,7 +217,8 @@ computePCAonRaw <- function(nCP, doRayleigh=FALSE)
         #Find average location of dip for all samples.
         wvDip <- round(quantile(wvDips,probs=0.9,na.rm=T))
         #If wvDip too close to EXwv, default do EXwv + 25
-        if (wvDip<(EXwv+10)) wvDip <- wvDip+25
+        if (wvDip<(EXwv+10)) wvDip <- EXwv+25
+        if (wvDip>(EXwv+25)) wvDip <- EXwv+25
         
         #Store to RayleighCutoffs
         RayleighCutoffs[[leNom]] <<- wvDip
@@ -238,7 +239,7 @@ computePCAonRaw <- function(nCP, doRayleigh=FALSE)
       #normalize matrices by closure by default
       dum <- normLigne(All_XData[[leNom]])
       #Compute PCA on normalized spectra
-      lesChoix <- computePCAsDT(input$npcs, dum, leNom)
+      lesChoix <- computePCAsDT(nCP, dum, leNom)
       #Store dummy to RayleighCutoffs
       RayleighCutoffs[[leNom]] <<- All_XData[[leNom]][1,2]
     }
@@ -265,6 +266,68 @@ normLigne <- function(dum)
   dats <- t(apply(dats,1,function(z) z*L/sum(z)))
   dum[-1,-1] <- dats
   return(dum)
+}
+
+#******************************************************************************
+Predict_plsda <- function(aggregOp,plsdaFit,mydata=NULL,probs=TRUE)
+  #Predicts classes or probabilities on mydata. If mydata is NULL, predicts on training
+  #If probs is TRUE, will return a table of probabilities.
+{
+  
+  N_modeles<-length(plsdaFit)
+  if (N_modeles>1){  #Need to aggregate results
+    ind_apply<-as.list(1:N_modeles)
+    Ps <- lapply(ind_apply, function(ii){
+      if (is.null(mydata))
+        predict(plsdaFit[[ii]]$finalModel, newdata=plsdaFit[[ii]]$trainingData[,-1], type="prob")
+      else
+        predict(plsdaFit[[ii]]$finalModel, newdata=mydata[[ii]][,-1], type="prob")
+    })
+    Ps<-lapply(Ps,drop)  #remove useless third dimension.
+    pooled <- Ps[[1]] * NA 
+    n <- nrow(pooled) 
+    classes <- colnames(pooled) 
+    
+    FUNC<-aggregOp
+    for(i in 1:ncol(pooled)) 
+    { 
+      tmp <- lapply(Ps, function(y, col) y[,col], col = i) 
+      tmp <- do.call("rbind", tmp) 
+      pooled[,i] <- apply(tmp, 2, function(x) do.call(FUNC,as.list(x))) 
+    } 
+    pooled <- t(apply(pooled, 1, function(x) x/sum(x))) #the probs combined should be normalized
+    classes <- colnames(pooled) 
+    val_pred_cl <- pooled
+    if (!probs)
+      val_pred_cl <- factor(classes[apply(pooled, 1, which.max)], levels = classes) 
+  }else  #only one model - no aggregation.
+  {
+    if (is.null(mydata)){
+      val_pred_cl <- predict(plsdaFit[[1]],newdata=plsdaFit[[1]]$trainingData[,-1]
+                             , type="prob")
+    }else
+    {
+      val_pred_cl <- predict(plsdaFit[[1]],newdata=mydata[[1]][,-1], type="prob")
+    }
+    classes<-colnames(val_pred_cl)
+    if (!probs)
+      val_pred_cl <- factor(classes[apply(val_pred_cl, 1, which.max)], levels = classes) 
+  }
+  return(val_pred_cl)
+}
+
+
+#***********************************************************************
+Plot_Confusion_Matrix <- function(conf){
+  melted<-reshape2::melt(conf)
+  ggplotly(
+    p1<-ggplot2::ggplot(data=melted,ggplot2::aes(x=Prediction,y=Reference,fill=value)) + 
+      ggplot2::geom_tile(colour="grey50") +
+      ggplot2::scale_fill_gradient2(low="blue",high="red",mid="white") +
+      ggplot2::theme(axis.text.x = element_text(angle=60,hjust=1)) +
+      ggplot2::theme(text = element_text(size=12)) +
+      ggplot2::geom_text(ggplot2::aes(label=value), size=4)
+  )
 }
 
 #***********************************************************************

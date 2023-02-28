@@ -65,7 +65,8 @@ shinyUI(fluidPage(
                             h2("PCA"),
                             selectInput("PCA_data","X data for PCA",
                                         choices=character(0L), multiple=F),
-                            sliderInput("npcs","Number of PCs",1,20,2,1),
+                            selectInput("npcs","Number of PCs",
+                                        choices = 1:2),
                             selectInput("pc1","PC on horizontal axis",
                                         choices="PC1", multiple=F),
                             
@@ -144,8 +145,8 @@ shinyUI(fluidPage(
                                        h4(strong('Data options - spectra are concatenated')),
                                        selectInput('XsforPCA','Spectrum types for PCA',
                                                    choices=character(0L),multiple=T),
-                                       sliderInput("NPCsforPCA", "Select number of PCs",
-                                                   min = 1, max=2, step=1, value=1),
+                                       selectInput("NPCsforPCA", "Select number of PCs",
+                                                   choices=1:2),
                                        hr(),
                                        h4(strong('Plotting options')),
                                        selectInput('PCATopPlotType','Choose plot type',
@@ -181,7 +182,94 @@ shinyUI(fluidPage(
                         )),
                
                ### PLSDA tab ----
-               tabPanel("PLSDA"),
+               tabPanel("PLSDA",
+                        sidebarLayout(
+                          sidebarPanel(width=3,
+                                       h3('Modeling definitions'),
+                                       hr(),
+                                       selectInput("XsForPLSDA","Spectra files for PLS",
+                                                   choices=character(0L), multiple = T),
+                                       selectInput("YForPLSDA","Variable to predict",
+                                                   choices=character(0L), multiple = F),
+                                       hr(),
+                                       h4('Train control options'),
+                                       
+                                       fluidRow(
+                                         column(6,
+                                            selectInput("PropTrainingForPLSDA",
+                                                        "Prop. of data for training",
+                                                        choices = as.character(seq(0.5,0.85,0.05)),
+                                                        selected = "0.6"),
+                                            selectInput("ResamplingForPLSDA", 'Resampling method',
+                                                        choices=c('None','CV','RepeatedCV','LOO'),
+                                                        selected='CV'),
+                                            selectInput("NbFoldsForPLSDA","Number of folds",
+                                                        choices=as.character(2:10),
+                                                        selected=3),
+                                            selectInput("NbRepetitionsForPLSDA",'Number of repetitions',
+                                                        choices=as.character(1:5),
+                                                        selected = 1)
+                                         ),
+                                         column(6,
+                                            selectInput("NbLVForPLSDA", "Nb of LVs(max)",
+                                                       choices = 1:20,
+                                                       selected=2),
+                                            selectInput('PreproForPLSDA', 'PreProcessing',
+                                                        choices = c('None','Center')),
+                                            selectInput('PredictMethodForPLSDA','Prediction method',
+                                                        choices=c('softmax')),
+                                            selectInput('PerfMetricForPLSDA','Performance metric',
+                                                        choices=c('Kappa','Accuracy'))
+                                         )
+                                       ),
+                                       hr(),
+                                       selectInput('AggregOpForPLSDA','Aggregation operator',
+                                                   choices=c("concatenate","median","max","prod","mean")),
+                                       hr(),
+                                       actionButton('ComputePLSDA',strong("Compute model")),
+                                       shinySaveButton("FSavePLSDA", strong("Save model"),
+                                                       "Save PLS model to file", 
+                                                       filetype=list(RData="RData")),
+                                       h4(strong('Infos for saving PLSDA model')),
+                                       textAreaInput('PLSDADescript', "Short description", 
+                                                     value="Description",
+                                                     width="600px", height="auto")
+                          ),
+                          
+                          
+                          mainPanel(width = 9,
+                                    column(1,
+                                           actionButton('PLSDAvalidationPlot', strong('Plot validation')),
+                                           hr(),
+                                           actionButton('PLSDAConfMatPlot', strong('Plot confusion matrix')),
+                                           hr(),
+                                           actionButton('PLSDAProbBoxPlot', strong('Prob. boxplots')),
+                                           hr(),
+                                           radioButtons('PLSDATrainTestBut', 'Select model type',
+                                                        choices=c('Validation','Test')),
+                                           hr(),
+                                           actionButton('ShowPLSDAPredTable',strong("Show prediction table")),
+                                           bsModal("PLSDAPreds", "PLSDA predictions",
+                                                   "ShowPLSDAPredTable", size = "large",
+                                                   dataTableOutput("PlsDAPredTable"),
+                                                   actionButton('savePLSDAPreds','Save'))
+                                           
+                                    ),
+                                    column(10, offset=1, 
+                                           plotlyOutput("PLSDAPlots", 
+                                                        height="600px",
+                                                        width="auto"
+                                           ),
+                                           verbatimTextOutput('PLSDAConsole',placeholder = T),
+                                           tags$head(tags$style("#PLSDAConsole{
+                                                color:blue;
+                                                font-size:14px; 
+                                                overflow-y:scroll; max-height: 500px; background: ghostwhite;}"))
+                                    ),
+                                    
+                                    
+                          )
+                        )),
                
                ### PLS tab ----
                tabPanel("PLS",
@@ -201,8 +289,9 @@ shinyUI(fluidPage(
                                                       selectInput("ResamplingForPLS", 'Resampling method',
                                                                   choices=c('None','CV','LOO'),
                                                                   selected='CV'),
-                                                      numericInput("NbLVForPLS", "Nb of LVs(max)",
-                                                                  min=1, max=25, step=1, value=5),
+                                                      selectInput("NbLVForPLS", "Nb of LVs(max)",
+                                                                  choices=1:25,
+                                                                  selected=5),
                                                       hr(),
                                                       selectInput("AggregateForPLS","Aggregation method",
                                                                  choices=c('Concatenate spectra'),
@@ -225,8 +314,9 @@ shinyUI(fluidPage(
                           mainPanel(width = 10,
                                     column(2,
                                            actionButton('PLSvalidationPlot', 'Plot validation'),
-                                           numericInput('NbLVPLS_Sel', 'Pick a number of LVs',
-                                                        min=1,max=25,step=1,value=1),
+                                           selectInput('NbLVPLS_Sel', 'Pick a number of LVs',
+                                                        choices=1:25,
+                                                        selected=2),
                                            hr(),
                                            h4('Prediction plots'),
                                            actionButton("PlotPLSPred","Plot"),
@@ -242,10 +332,10 @@ shinyUI(fluidPage(
                                            hr(),
                                            h4('Score plot'),
                                            actionButton('PLSScorePlot','Plot'),
-                                           numericInput('PLSScorePlotFirstLV', 'LV on x-axis',
-                                                       min=1, max=2, step=1, value=1),
-                                           numericInput('PLSScorePlotSecondLV', 'LV on y-axis',
-                                                        min=1, max=2, step=1, value=1),
+                                           selectInput('PLSScorePlotFirstLV', 'LV on x-axis',
+                                                       choices=1:2),
+                                           selectInput('PLSScorePlotSecondLV', 'LV on y-axis',
+                                                        choices=1:2),
                                            selectInput("PLSScorePlotColorBy", "Color by",
                                                        choices=c()),
                                            hr(),
@@ -255,7 +345,7 @@ shinyUI(fluidPage(
                                                    actionButton('savePLSPreds','Save'))
                                            
                                     ),
-                                    column(6, offset=2, 
+                                    column(9, offset=1,
                                            textOutput("PLSPlotID"),
                                            tags$head(tags$style("#PLSPlotID{
                                                                  font-size: 20px;

@@ -49,6 +49,30 @@ shinyServer(function(input, output, session) {
     # *********************************************************************
     
     # On Data tab ----
+    
+    # *********************************************************************
+    
+    # Data tab ----
+    ## Reacts to Data tab activation ----
+    
+    observeEvent(input$tabs,{
+      if(input$tabs == "Data"){ #set up the pages
+        
+        #In case user did not apply prepros
+        preproParams <- collectPreProParams(PPvaluesTrunc,input)
+        Apply_PrePro(preproParams)
+        #Force redraw
+        s <- unique(input$Ys_rows_selected)
+        if (!is.null(s)){
+          proxy_Ys %>% selectRows(NULL)
+          proxy_Ys %>% selectRows(s)
+        }
+      }
+    }, ignoreInit = TRUE)
+        
+    # *********************************************************************
+    
+    
     ## Shows Y filename. Triggered by input$files ----
     output$yFileName <- renderText({
             inFile <- input$files
@@ -95,7 +119,7 @@ shinyServer(function(input, output, session) {
     # Triggered by selection in Ys or changes in npcs, PC1, PC2, pctPtColoyBy, PCA_Data
     output$acpPlots <- renderPlotly({
         s <- unique(input$Ys_rows_selected)
-        dum <- input$npcs
+        dum <- as.numeric(input$npcs)
         mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
         t <- list(
           family = "sans serif",
@@ -292,9 +316,11 @@ shinyServer(function(input, output, session) {
         #Sets max nb of pcs to 15 or the number of samples-1 if smaller
         nSamples <- nrow(All_XData[[1]])-1
         maxnCP <- ifelse (nSamples < 21, nSamples-1, 20 )
-        updateSliderInput(session,"npcs",max=maxnCP,value=5)
+        updateSelectInput(session,"npcs",choices=1:maxnCP,
+                          selected=2)
         
-        lesChoix <- computePCAonRaw(input$npcs,doRayleigh = TRUE)
+        lesChoix <- computePCAonRaw(as.numeric(input$npcs),
+                                    doRayleigh = TRUE)
         
         #Populate Xs file selection and select first by default
         updateSelectInput(session, "Xs",               
@@ -362,7 +388,7 @@ shinyServer(function(input, output, session) {
     ## Reacts to number of PCs ----
     observeEvent(input$npcs,{
        
-       lesChoix <- computePCAonRaw(input$npcs,doRayleigh=FALSE)
+       lesChoix <- computePCAonRaw(as.numeric(input$npcs),doRayleigh=FALSE)
        
         #Populate select CPs to plot
         updateSelectInput(session,"pc1",
@@ -437,7 +463,7 @@ shinyServer(function(input, output, session) {
                               numericInput(paste0(id,"_B"), "Band Center",ctr,
                                            lowWL,hiWL,1),
                               numericInput(paste0(id,"_C"), 'Bandwidth', 1,1,25,2),
-                              h3('      '),
+                              h3(' '),
                               checkboxInput(paste0(id,"_D"), strong('SAVITSKY-GOLAY'), FALSE, width='20px'),
                               numericInput(paste0(id,'_E'), 'Bandwidth',5,5,25,2),
                               numericInput(paste0(id,'_F'), 'Polynomial order',3,2,10,1),
@@ -464,7 +490,7 @@ shinyServer(function(input, output, session) {
           #Apply default prepro
           preproParams <- collectPreProParams(PPvaluesTrunc,dummyInput)
           Apply_PrePro(preproParams)
-          lesChoix <- computePCAonRaw(input$npcs,doRayleigh = TRUE)
+          lesChoix <- computePCAonRaw(as.numeric(input$npcs),doRayleigh = FALSE)
 
           
           #Force redraw
@@ -497,7 +523,7 @@ shinyServer(function(input, output, session) {
             for (k in 1:length(All_XData_p)){
               All_XData_p[[k]] <<- All_XData_p[[k]][-(1+lesRows),]
             }
-            lesChoix <- computePCAonRaw(input$npcs,doRayleigh=FALSE)
+            lesChoix <- computePCAonRaw(as.numeric(input$npcs),doRayleigh=FALSE)
         }
         proxy_Ys %>% selectRows(NULL)
     })
@@ -541,7 +567,7 @@ shinyServer(function(input, output, session) {
         }
         
         
-        lesChoix <- computePCAonRaw(input$npcs,doRayleigh=FALSE)
+        lesChoix <- computePCAonRaw(as.numeric(input$npcs),doRayleigh=FALSE)
         proxy_Ys %>% selectRows(1)  #Trigger PCA plot refresh
         proxy_Ys %>% selectRows(NULL)
         
@@ -602,7 +628,8 @@ shinyServer(function(input, output, session) {
       clmn <- input$PreProsTrunc_cell_edit$col+1
       laVal <- as.numeric(input$PreProsTrunc_cell_edit$value)
       # First make sure it is within limits of the raw spectra
-      wvLimits <- range(All_XData_p[[row]][1,-1])
+      # wvLimits <- range(All_XData_p[[row]][1,-1])  #RayleighCutoffs
+      wvLimits <- range(All_XData[[XDataList[[row]]]][1,-1])    #Raw wavelenght range
       if (!between(laVal,wvLimits[1],wvLimits[2])){ #not in limit
         laVal <- PPvaluesTrunc$dfWorking$x$data[row, clmn]
       }
@@ -752,7 +779,8 @@ shinyServer(function(input, output, session) {
                             choices = lesChoix ,
                             selected = lesChoix[1])
           nSamples <- nrow(Ys_df)
-          updateNumericInput(session,"NbLVForPLS",max=min(c((nSamples-1),20)))
+          updateSelectInput(session,"NbLVForPLS",
+                            choices = 1:min(c((nSamples-1),20)))
           lesChoix <- names(Filter(function(x) is.factor(x),Ys_df))
           updateSelectInput(session,"PLSPredPlotColorBy",
                             choices = lesChoix[-1])
@@ -796,32 +824,33 @@ shinyServer(function(input, output, session) {
     
     # *********************************************************************
     
-    ## Verify in nb LV for computing is within limits ----
+    ## Verify in nb LV for showing results is within limits ----
     observeEvent(input$NbLVForPLS,{
-      nbLVs <- input$NbLVForPLS
+      nbLVs <- as.numeric(input$NbLVForPLS)
       if (!is.null(nbLVs) & !is.na(nbLVs)){
-        nbSamples <- nrow(Ys_df)
-        maxi <- min(c(20,(nbSamples-1)))
-        if (nbLVs>maxi & maxi>0) {
-         isolate({
-           updateNumericInput(session,"NbLVForPLS",value=maxi)
-           updateNumericInput(session,"NbLVPLS_Sel", max = maxi)
-         })
-         
-        }
+        # nbSamples <- nrow(Ys_df)
+        # maxi <- min(c(20,(nbSamples-1)))
+        updateSelectInput(session,'PLSScorePlotFirstLV',
+                            choices = 1:nbLVs)
+        updateSelectInput(session,'PLSScorePlotSecondLV',
+                            choices = 1:nbLVs)
+        updateSelectInput(session,'NbLVPLS_Sel',
+                          choices = 1:nbLVs)
       }
+      
     })
     
     # *********************************************************************
     
-    ## Verify in nb LV for assessing is within limits ----
+    ## Verify in nb LV for plotting scores is within limits ----
     observeEvent(input$NbLVPLS_Sel,{
-      nbLVs <- input$NbLVPLS_Sel
+      nbLVs <- as.numeric(input$NbLVPLS_Sel)
       if (!is.null(nbLVs) & !is.na(nbLVs)){
-        maxi <- input$NbLVForPLS
-        if (nbLVs>maxi) {
-          updateNumericInput(session,"NbLVPLS_Sel", value = maxi)
-        }
+        maxi <- as.numeric(input$NbLVForPLS)
+        updateSelectInput(session,'PLSScorePlotFirstLV',
+                          choices = 1:nbLVs)
+        updateSelectInput(session,'PLSScorePlotSecondLV',
+                          choices = 1:nbLVs)
       }
     })
     
@@ -848,7 +877,7 @@ shinyServer(function(input, output, session) {
         
       #collect parameters
       YName <- input$YForPLS
-      nbLV <- input$NbLVForPLS
+      nbLV <- as.numeric(input$NbLVForPLS)
       aggr <- input$AggregateForPLS
       Y <- Ys_df[[YName]]
       XNames <- as.list(input$XsForPLS)
@@ -928,7 +957,7 @@ shinyServer(function(input, output, session) {
           datatype = input$XsForPLS,
           aggregation = input$AggregateForPLS
         )
-        pls_ncomp <- input$NbLVPLS_Sel
+        pls_ncomp <- as.numeric(input$NbLVPLS_Sel)
         colorby <- input$PLSPredPlotColorBy
         save(model_descript,PP_params,plsFit,pls_ncomp,colorby,file=leFichier) 
       }
@@ -969,8 +998,8 @@ shinyServer(function(input, output, session) {
       labelWith <- input$PLSPredPlotLabel
       if (whichPLSPlot=="Pred")
         isolate({
-          nc=input$NbLVPLS_Sel
-          nc <- min(nc,input$NbLVForPLS)
+          nc=as.numeric(input$NbLVPLS_Sel)
+          nc <- min(nc,as.numeric(input$NbLVForPLS))
           leType <- input$PredPlotTypePLS
           output$PLSPlotID <-   renderText(paste0("PREDICTION - ",leType))
           pl<-plot(plsFit[[1]],plottype = "prediction",
@@ -983,7 +1012,7 @@ shinyServer(function(input, output, session) {
           mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
           
           output$PLSPlots <-   renderPlotly({
-            nc=input$NbLVPLS_Sel
+            nc=as.numeric(input$NbLVPLS_Sel)
             plotly::plot_ly() %>%
             add_markers(data=pl,          #Plot all points
                         x=as.formula("~measured"),
@@ -1019,8 +1048,8 @@ shinyServer(function(input, output, session) {
             x_id=unlist(x_id)
             x_cls=x_id[seq(1,2*N_xlabels,2)]
             xlabels=as.numeric(x_id[seq(2,2*N_xlabels,2)])
-            nc=input$NbLVPLS_Sel
-            nc <- min(nc,input$NbLVForPLS)
+            nc=as.numeric(input$NbLVPLS_Sel)
+            nc <- min(nc,as.numeric(input$NbLVForPLS))
             df=data.frame(y=plsFit[[1]]$coefficients[,1,nc],
                           Cl=x_cls, 
                           xlabs=as.numeric(xlabels))
@@ -1038,27 +1067,40 @@ shinyServer(function(input, output, session) {
     # *********************************************************************
     
     ## Reacts to Score plot button----
-    observeEvent(input$PLSScorePlot ,{
-      whichPLSPlot <<- "Score"
-      output$PLSPlotID <-   renderText("Score plot")
-      dats <- scores(plsFit[[1]])
-      pl <- data.frame(x=dats[,input$PLSScorePlotFirstLV], y=dats[,input$PLSScorePlotSecondLV])
-      mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
-
-      output$PLSPlots <-   renderPlotly({
-        colBy <- input$PLSScorePlotColorBy
-        plotly::plot_ly() %>%
-          add_markers(data=pl,          #Plot all points
-                      x=as.formula("~x"),
-                      y=as.formula("~y"),
-                      type = "scatter", mode = "markers",
-                      color=as.character(Ys_df[[colBy]]),
-                      colors = mycolors,
-                      size=8,
-                      text=as.character(Ys_df[,1]),
-                      hovertext=as.character(Ys_df[,1]),
-                      hovertemplate = paste('EchID: %{text}'))
-      })
+    observeEvent(input$PLSScorePlot ,
+                 whichPLSPlot <<- "Score"
+     )
+    
+    observe({
+      input$PLSScorePlot
+      input$NbLVPLS_Sel
+      input$PLSScorePlotSecondLV
+      input$PLSScorePlotFirstLV
+      if (whichPLSPlot=="Score")
+        isolate({
+          output$PLSPlotID <- renderText("Score plot")
+          dats <- scores(plsFit[[1]])
+          pl <- data.frame(x=dats[,as.numeric(input$PLSScorePlotFirstLV)]
+                           , y=dats[,as.numeric(input$PLSScorePlotSecondLV)])
+          colnames(pl) <- c(paste0('LV',input$PLSScorePlotFirstLV),
+                            paste0('LV',input$PLSScorePlotSecondLV))
+          mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
+    
+          output$PLSPlots <-   renderPlotly({
+            colBy <- input$PLSScorePlotColorBy
+            plotly::plot_ly() %>%
+              add_markers(data=pl,          #Plot all points
+                          x=as.formula(paste0("~",colnames(pl)[1])),
+                          y=as.formula(paste0("~",colnames(pl)[2])),
+                          type = "scatter", mode = "markers",
+                          color=as.character(Ys_df[[colBy]]),
+                          colors = mycolors,
+                          size=8,
+                          text=as.character(Ys_df[,1]),
+                          hovertext=as.character(Ys_df[,1]),
+                          hovertemplate = paste('EchID: %{text}'))
+          })
+        })
     })
     
     # *********************************************************************
@@ -1067,12 +1109,12 @@ shinyServer(function(input, output, session) {
     observeEvent(input$ShowPLSPredTable,{
     
       pl<-plot(plsFit[[1]],plottype = "prediction",
-               ncomp=input$NbLVPLS_Sel,
+               ncomp=as.numeric(input$NbLVPLS_Sel),
                which="train")
       dev.off(dev.list()["RStudioGD"])
       dat_tbl=as.data.frame(pl)
       pl<-plot(plsFit[[1]],plottype = "prediction",
-               ncomp=input$NbLVPLS_Sel,
+               ncomp=as.numeric(input$NbLVPLS_Sel),
                which="validation")
       dat_tbl=cbind(dat_tbl,as.data.frame(pl)[,2])
       dat_tbl=cbind(Ys_df[,1],dat_tbl,NoSeq=seq_len(nrow(dat_tbl)))
@@ -1086,12 +1128,12 @@ shinyServer(function(input, output, session) {
     ## Reacts to Save button on modal PlsPredTable ----
     observeEvent(input$savePLSPreds ,{
       pl<-plot(plsFit[[1]],plottype = "prediction",
-               ncomp=input$NbLVPLS_Sel,
+               ncomp=as.numeric(input$NbLVPLS_Sel),
                which="train")
       dev.off(dev.list()["RStudioGD"])
       dat_tbl=as.data.frame(pl)
       pl<-plot(plsFit[[1]],plottype = "prediction",
-               ncomp=input$NbLVPLS_Sel,
+               ncomp=as.numeric(input$NbLVPLS_Sel),
                which="validation")
       dat_tbl=cbind(dat_tbl,as.data.frame(pl)[,2])
       dat_tbl=cbind(Ys_df[,1],dat_tbl,NoSeq=seq_len(nrow(dat_tbl)))
@@ -1135,7 +1177,7 @@ shinyServer(function(input, output, session) {
           
           updateSelectInput(session, 'PCATopPlotType',
                               selected = 'Screeplot')
-          updateSliderInput(session, "NPCsforPCA", max=lePCA_NCPs)
+          updateSelectInput(session, "NPCsforPCA", choices=1:lePCA_NCPs)
           updateSelectInput(session, "XAxisPCAPlot", 
                             choices = paste0("PC",(1:lePCA_NCPs)))
           updateSelectInput(session, "YAxisPCAPlot",
@@ -1217,7 +1259,8 @@ shinyServer(function(input, output, session) {
              },
              OD_SD = {
                pca2<-pr_2_prin(lePCA)
-               dd <- chemometrics::pcaDiagplot(dat_4_PCA,pca2,a=input$NPCsforPCA,
+               dd <- chemometrics::pcaDiagplot(dat_4_PCA,pca2,
+                                               a=as.numeric(input$NPCsforPCA),
                                                plot=FALSE,scale=FALSE)
                df <- data.frame(Score=dd$SDist,Outside=dd$ODist)
                df <- cbind(df,Ys_df[input$PCAPlotColorBy])
@@ -1231,6 +1274,11 @@ shinyServer(function(input, output, session) {
                              size=8,
                              text=as.character(Ys_df[[1]]),
                              hovertemplate = paste('EchID: %{text}'),
+                 ) %>%
+                 layout(xaxis = list(title = list(text='In model distance (scores)',
+                                                  font=list(size=20))), 
+                        yaxis = list(title = list(text='Outside model distance',
+                                                  font=list(size=20)))
                  )
 
              }
@@ -1256,7 +1304,7 @@ shinyServer(function(input, output, session) {
       }
       y <- cbind(data.frame(ID=c("ID",Ys_df[[1]])),y)
       doPCA(y)
-      updateSliderInput(session, input$NPCsforPCA, max=lePCA_NCPs)
+      updateSelectInput(session, input$NPCsforPCA, choices=1:lePCA_NCPs)
       updateSelectInput(session, input$XAxisPCAPlot, 
                         choices = as.character(1:lePCA_NCPs))
       updateSelectInput(session, input$YAxisPCAPlot,
@@ -1324,6 +1372,217 @@ shinyServer(function(input, output, session) {
              file=fileinfo$datapath)
       }
     })
+    
+    # *********************************************************************
+    
+    # PLSDA tab ----
+    ## Reacts to PLSDA tab activation ----
+    observeEvent(input$tabs,{
+      if (input$tabs == "PLSDA"){ #set up the pages
+        isolate({
+          updateSelectInput(session,"XsForPLSDA", choices=input$Xs,
+                            selected=input$Xs[1])
+          lesChoix <- names(Filter(function(x) is.factor(x),Ys_df))[-1]
+          updateSelectInput(session,"YForPLSDA",
+                            choices = lesChoix ,
+                            selected = lesChoix[1])
+          nSamples <- nrow(Ys_df)
+          leMax <- min(c((nSamples-1),25))
+          updateSelectInput(session,"NbLVForPLSDA",choices=1:leMax)
+          updateSelectInput(session,"PLSPredPlotColorBy",
+                            choices = lesChoix[-1])
+        })
+      }
+    
+    output$PLSDAPlots <- renderPlotly({
+      text = "PLOT OUTPUT AREA"
+      ggplotly(
+        ggplot() + 
+          annotate("text", x = 4, y = 25, size=8, label = text) + 
+          theme_void()
+      )
+    })
+    
+    output$PLSDaAConsole <- renderPrint({
+      dum <- "Console output area"
+      write(dum, file="")
+    })  
+      
+    shinyjs::hide("PLSDADescript")
+    shinyjs::hide("FSavePLSDA")
+    
+    })
+   
+    # *********************************************************************
+    
+    ## Reacts to  Compute PLSDA model ----
+    
+    observeEvent(input$ComputePLSDA,{
+      
+      output$PLSDAPlots <- renderPlotly({
+        text = "PLOT OUTPUT AREA"
+        ggplotly(
+          ggplot() + 
+            annotate("text", x = 4, y = 25, size=8, label = text) + 
+            theme_void()
+        )
+      })
+      
+      output$PLSDaAConsole <- renderPrint({
+        dum <- "Console output area"
+        write(dum, file="")
+      })
+    
+    
+      #Retrieve proportion of samples for training
+      laprop <- as.numeric(input$PropTrainingForPLSDA)
+      #ATTN : do not work with XData_p but with the selected items.
+      plsda_inTrain <<- caret::createDataPartition(y=Ys_df[,input$YForPLSDA],
+                                                   p=laprop, list=FALSE)
+      
+      Ys <- data.frame(Cl1=Ys_df[,input$YForPLSDA])
+      Xs <- input$XsForPLSDA
+      
+      if (input$AggregOpForPLSDA=="concatenate"){
+        #ATTN : do not work with XData_p but with the selected items.
+        for (k in Xs){
+          spdf<-as.data.frame(All_XData_p[[k]][-1,-1])
+          pre <- strsplit(k,"_")[[1]][1]
+          colnames(spdf)<-paste(pre,as.character(All_XData_p[[k]][1,-1]),sep="_")
+          y <- cbind(Ys,spdf)
+        }
+        plsda_set <<- list(y)
+      }else
+      {
+        plsda_set <<- lapply(as.list(Xs), function(ii){
+          y<-data.frame(Cl1=Ys ,All_XData_p[[ii]][-1,-1])
+          colnames(y)[-1]<-as.character(All_XData_p[[ii]][1,-1])
+          return(y)
+        })
+      }
+      
+      
+      
+      
+      lambdas<-lapply(Xs, function(ii){
+        return(All_XData_p[[ii]][1,-1])
+      })
+      
+      training <- lapply(plsda_set, function(x) x[plsda_inTrain,])
+      testing <- lapply (plsda_set, function(x) x[-plsda_inTrain,])
+      
+      
+      
+      
+      #Training - may take some time
+      ctrl<-caret::trainControl(method = input$ResamplingForPLSDA,
+                                number=input$NbFoldsForPLSDA,
+                                repeats=input$NbRepetitionsForPLSDA,
+                                classProbs = TRUE,
+                                returnData = TRUE,
+                                allowParallel = TRUE)
+      
+      
+      #Fitting model - This may take some time
+      output$PLSDAConsole <- renderPrint({
+        dum <- "COMPUTING MODEL - WAIT..."
+        write(dum, file="")
+      })
+      
+      if (input$PreproForPLSDA=="None"){
+        prepro<-NULL
+      }else prepro<-input$PreproForPLSDA 
+      
+      suppressWarnings(
+        plsdaFit <<- lapply(training, function(x){
+          caret::train(Cl1~.,
+                       data=x,
+                       method="pls",
+                       tuneLength=as.integer(input$NbLVForPLSDA),
+                       trControl=ctrl,
+                       preProc=prepro,
+                       probMethod=input$PredictMethodForPLSDA,
+                       metric=input$PerfMetricForPLSDA)
+        })
+      )
+      
+      
+      #Compute confusion matrices for train and test set for output
+      N_modeles<-length(plsdaFit)
+      val_pred_cl <-Predict_plsda(input$AggregOpForPLSDA, 
+                                  plsdaFit,probs=FALSE)
+      val_confusionmat<-caret::confusionMatrix(data=val_pred_cl,reference = plsdaFit[[1]]$trainingData[,1])
+      
+      test_pred_cl <- Predict_plsda(input$AggregOpForPLSDA, 
+                                    plsdaFit,testing,probs=FALSE)
+      test_confusionmat <- caret::confusionMatrix(data=test_pred_cl,reference = testing[[1]][,1])
+      
+      #Generate output to GUI console.
+      lesnoms<-Xs
+      dumind<-as.list(1:length(plsdaFit)) 
+      plsda_txt_output<<-lapply(dumind,function(x) utils::capture.output(print(plsdaFit[[x]])))
+      if (input$AggregOpForPLSDA=="concatenate")
+        lesnoms=as.list(paste(lesnoms,collapse=" + "))
+      for (k in 1:length(plsdaFit)) plsda_txt_output[[k]][1]<<-paste("\n******************\nPLSDA on ",
+                                                                     lesnoms[[k]], sep = "")
+      if (N_modeles>1){
+        FUNC<-input$AggregOpForPLSDA 
+        plsda_txt_output <<- c(plsda_txt_output,
+                               paste("*******\nConfusion matrix on training data for models aggregated with ",FUNC,
+                                     ".\n",sep=""),
+                               utils::capture.output(print(val_confusionmat)))
+        plsda_txt_output <<- c(plsda_txt_output,
+                               paste("*******\nConfusion matrix on test data for models aggregated with ",FUNC,
+                                     ".\n",sep=""),
+                               utils::capture.output(print(test_confusionmat)))
+      }else
+      {  plsda_txt_output <<- c(plsda_txt_output,
+                                paste("*******\nConfusion matrix on training data for model on ",lesnoms[[1]],
+                                      ".\n",sep=""),
+                                utils::capture.output(print(val_confusionmat)))
+      plsda_txt_output <<- c(plsda_txt_output,
+                             paste("*******\nConfusion matrix on test data for model on ",lesnoms[[1]],
+                                   ".\n",sep=""),
+                             utils::capture.output(print(test_confusionmat)))
+      }
+      
+      output$PLSDAConsole <- renderPrint({
+        dum <- unlist(plsda_txt_output)
+        write(dum, file="")
+      })
+      
+      shinyjs::show("PLSDADescript")    
+      shinyjs::show("FSavePLSDA")
+    })
+    
+    #*******************************************************************
+    ## Reacts to plot confusion matrix ----
+    observe({
+      input$PLSDAConfMatPlot
+      isolate({
+        
+        if (input$PLSDATrainTestBut=="Validation"){
+          pred_cl <- Predict_plsda(input$AggregOpForPLSDA,
+                                   plsdaFit,probs=FALSE)
+          confusionmat<-caret::confusionMatrix(data=pred_cl,reference = plsdaFit[[1]]$trainingData[,1])
+        }else
+        {
+          testing <- lapply (plsda_set, function(x) x[-plsda_inTrain,])
+          pred_cl <- Predict_plsda(input$AggregOpForPLSDA,
+                                   plsdaFit,testing,probs=FALSE)
+          confusionmat<-caret::confusionMatrix(data=pred_cl,reference = testing[[1]][,1])
+        }
+        
+        
+        p <- Plot_Confusion_Matrix(confusionmat$table)
+        output$PLSDAPlots <- renderPlotly({
+          p
+        })
+      })
+      
+    })
+   
+
     
 })
       
