@@ -1105,7 +1105,7 @@ shinyServer(function(input, output, session) {
     
     # *********************************************************************
     
-    ## Reacts to ShowPLSPredTable button
+    ## Reacts to ShowPLSPredTable button ----
     observeEvent(input$ShowPLSPredTable,{
     
       pl<-plot(plsFit[[1]],plottype = "prediction",
@@ -1142,7 +1142,7 @@ shinyServer(function(input, output, session) {
       
       outfile=choose.files(caption="Define file name",
                            multi=FALSE, 
-                           filters=Filters[c("txt")])
+                           filters=Filters[c("txt"),])
       utils::write.table(dat_tbl,
                          file=outfile,
                          sep="\t",
@@ -1391,6 +1391,7 @@ shinyServer(function(input, output, session) {
           updateSelectInput(session,"NbLVForPLSDA",choices=1:leMax)
           updateSelectInput(session,"PLSPredPlotColorBy",
                             choices = lesChoix[-1])
+          updateSelectInput(session,input$ResamplingForPLSDA, selected = "cv")
         })
       }
     
@@ -1449,9 +1450,9 @@ shinyServer(function(input, output, session) {
           spdf<-as.data.frame(All_XData_p[[k]][-1,-1])
           pre <- strsplit(k,"_")[[1]][1]
           colnames(spdf)<-paste(pre,as.character(All_XData_p[[k]][1,-1]),sep="_")
-          y <- cbind(Ys,spdf)
+          Ys <- cbind(Ys,spdf)
         }
-        plsda_set <<- list(y)
+        plsda_set <<- list(Ys)
       }else
       {
         plsda_set <<- lapply(as.list(Xs), function(ii){
@@ -1475,12 +1476,27 @@ shinyServer(function(input, output, session) {
       
       
       #Training - may take some time
-      ctrl<-caret::trainControl(method = input$ResamplingForPLSDA,
-                                number=input$NbFoldsForPLSDA,
-                                repeats=input$NbRepetitionsForPLSDA,
-                                classProbs = TRUE,
-                                returnData = TRUE,
-                                allowParallel = TRUE)
+      waiter <- waiter::Waiter$new(html = spin_3(),  
+                                   color = transparent(.75))
+      waiter$show()
+      on.exit(waiter$hide())
+      
+      if (input$ResamplingForPLSDA == 'repeatedcv'){
+        ctrl<-caret::trainControl(method = input$ResamplingForPLSDA,
+                                  number=input$NbFoldsForPLSDA,
+                                  repeats=input$NbRepetitionsForPLSDA,
+                                  classProbs = TRUE,
+                                  returnData = TRUE,
+                                  allowParallel = TRUE)
+      }else
+      {
+        ctrl<-caret::trainControl(method = input$ResamplingForPLSDA,
+                                  number=input$NbFoldsForPLSDA,
+                                  classProbs = TRUE,
+                                  returnData = TRUE,
+                                  allowParallel = TRUE)
+      }
+     
       
       
       #Fitting model - This may take some time
@@ -1551,38 +1567,316 @@ shinyServer(function(input, output, session) {
         write(dum, file="")
       })
       
+      #Plot
+      nom_lesX <- input$XsForPLSDA
+      accs <- lapply(plsdaFit,function(p) p$results$Accuracy)
+      accsSD <- lapply(plsdaFit,function(p) p$results$AccuracySD)
+      N <- length(accs[[1]])
+      grp <- rep(unlist(nom_lesX),each=N)
+      if (input$AggregOpForPLSDA == "concatenate")
+        grp <- rep(paste(nom_lesX,collapse=" + "),N*length(accs))
+      dfPl <- data.frame(GRP=as.factor(grp),
+                         VLs=rep(1:N,times=length(accs)),
+                         accs=unlist(accs),
+                         accsSD=unlist(accsSD))
+      
+      dfPl <- cbind(dfPl, data.frame(Min=dfPl$accs-dfPl$accsSD))
+      dfPl <- cbind(dfPl, data.frame(Max=dfPl$accs+dfPl$accsSD))
+      output$PLSDAPlots <- renderPlotly({
+        p <- ggplot2::ggplot(dfPl,ggplot2::aes(x=VLs,y=accs)) + 
+          ggplot2::geom_errorbar(ggplot2::aes(ymin=Min,ymax=Max),width=0.2,color="mediumblue") + 
+          ggplot2::geom_line(color="blue",lwd=1)
+        if (length(levels(dfPl$GRP)) > 1){
+          p <- p +  ggplot2::facet_grid(dfPl$GRP~.)
+        }else
+        {
+          p <- p + ggplot2::ggtitle(levels(dfPl$GRP))
+        }
+        #workaround bug with geom_errorbar
+        p$layers[[1]]$geom_params$flipped_aes <- FALSE
+        ggplotly(p)
+      })
+      
       shinyjs::show("PLSDADescript")    
       shinyjs::show("FSavePLSDA")
+      whichPLSDAPlot <<- "Validation"
     })
     
     #*******************************************************************
     ## Reacts to plot confusion matrix ----
+   
+    observeEvent(input$PLSDAConfMatPlot ,
+                 whichPLSDAPlot <<- "ConfMat"
+    )
+    
+    
     observe({
       input$PLSDAConfMatPlot
-      isolate({
-        
-        if (input$PLSDATrainTestBut=="Validation"){
-          pred_cl <- Predict_plsda(input$AggregOpForPLSDA,
-                                   plsdaFit,probs=FALSE)
-          confusionmat<-caret::confusionMatrix(data=pred_cl,reference = plsdaFit[[1]]$trainingData[,1])
-        }else
-        {
-          testing <- lapply (plsda_set, function(x) x[-plsda_inTrain,])
-          pred_cl <- Predict_plsda(input$AggregOpForPLSDA,
-                                   plsdaFit,testing,probs=FALSE)
-          confusionmat<-caret::confusionMatrix(data=pred_cl,reference = testing[[1]][,1])
-        }
-        
-        
-        p <- Plot_Confusion_Matrix(confusionmat$table)
-        output$PLSDAPlots <- renderPlotly({
-          p
+      input$PLSDATrainTestBut
+      if (whichPLSDAPlot=="ConfMat"){
+        isolate({
+          
+          if (input$PLSDATrainTestBut=="Validation"){
+            pred_cl <- Predict_plsda(input$AggregOpForPLSDA,
+                                     plsdaFit,probs=FALSE)
+            confusionmat<-caret::confusionMatrix(data=pred_cl,reference = plsdaFit[[1]]$trainingData[,1])
+          }else
+          {
+            testing <- lapply (plsda_set, function(x) x[-plsda_inTrain,])
+            pred_cl <- Predict_plsda(input$AggregOpForPLSDA,
+                                     plsdaFit,testing,probs=FALSE)
+            confusionmat<-caret::confusionMatrix(data=pred_cl,reference = testing[[1]][,1])
+          }
+          
+          
+          p <- Plot_Confusion_Matrix(confusionmat$table)
+          output$PLSDAPlots <- renderPlotly({
+            p
+          })
         })
-      })
+      }
       
     })
    
-
+    #*******************************************************************
+    ## Reacts to plot PLSDA Validation plot ----
+    
+    observeEvent(input$PLSDAvalidationPlot ,
+                 whichPLSDAPlot <<- "Validation"
+    )
+    
+    
+    observe({
+      input$PLSDAvalidationPlot
+      if (whichPLSDAPlot=="Validation"){
+        isolate({
+          nom_lesX <- input$XsForPLSDA
+          accs <- lapply(plsdaFit,function(p) p$results$Accuracy)
+          accsSD <- lapply(plsdaFit,function(p) p$results$AccuracySD)
+          N <- length(accs[[1]])
+          grp <- rep(unlist(nom_lesX),each=N)
+          if (input$AggregOpForPLSDA == "concatenate")
+            grp <- rep(paste(nom_lesX,collapse=" + "),N*length(accs))
+          dfPl <- data.frame(GRP=as.factor(grp),
+                        VLs=rep(1:N,times=length(accs)),
+                        accs=unlist(accs),
+                        accsSD=unlist(accsSD))
+          
+          dfPl <- cbind(dfPl, data.frame(Min=dfPl$accs-dfPl$accsSD))
+          dfPl <- cbind(dfPl, data.frame(Max=dfPl$accs+dfPl$accsSD))
+          output$PLSDAPlots <- renderPlotly({
+            p <- ggplot2::ggplot(dfPl,ggplot2::aes(x=VLs,y=accs)) + 
+              ggplot2::geom_errorbar(ggplot2::aes(ymin=Min,ymax=Max),width=0.2,color="mediumblue") + 
+              ggplot2::geom_line(color="blue",lwd=1)
+            if (length(levels(dfPl$GRP)) > 1){
+              p <- p +  ggplot2::facet_grid(dfPl$GRP~.)
+            }else
+            {
+              p <- p + ggplot2::ggtitle(levels(dfPl$GRP))
+            }
+            #workaround bug with geom_errorbar
+            p$layers[[1]]$geom_params$flipped_aes <- FALSE
+            ggplotly(p)
+          })
+        })
+      }
+    })
+    
+    
+    #*******************************************************************
+    ## Reacts to plot PLSDA Prob. boxplot ----
+    
+    observeEvent(input$PLSDAProbBoxPlot,
+                 whichPLSDAPlot <<- "ProBoxplot"
+    )
+    
+    
+    observe({
+      input$PLSDAProbBoxPlot
+      input$PLSDATrainTestBut
+      if (whichPLSDAPlot=="ProBoxplot"){
+        isolate({
+    
+          if (input$PLSDATrainTestBut == "Validation"){
+            pred_prob <- Predict_plsda(input$AggregOpForPLSDA, plsdaFit,probs=TRUE)
+            dum1<-data.frame(cl=plsdaFit[[1]]$trainingData[,1],pred_prob)
+            
+          }else
+          {
+            testing <- lapply (plsda_set, function(x) x[-plsda_inTrain,])
+            pred_prob <- Predict_plsda(input$AggregOpForPLSDA, plsdaFit,testing,probs=TRUE)
+            dum1<-data.frame(cl=testing[[1]][,1],pred_prob)
+            
+          }
+          dum2<-tidyr::gather(dum1,Pred,Prob,-cl,factor_key = TRUE)
+          levels(dum2$cl)=paste("True: ",levels(dum2$cl),sep="")
+          
+          output$PLSDAPlots <- renderPlotly({
+            ggplotly(
+                ggplot2::ggplot(dum2,ggplot2::aes(Pred,Prob)) +
+                ggplot2::geom_boxplot()+ggplot2::facet_wrap(~cl) +
+                ggplot2::theme(text = element_text(size=12)) +
+                ggplot2::theme(axis.text.x = element_text(angle=60, hjust=1, vjust=1))
+            )
+          })
+        })
+      }
+    })
+    
+    
+    #*******************************************************************
+    ## Reacts to plot PLSDA B-Coeff ----
+    
+    observeEvent(input$PLSDABCoeffPlot,
+                 whichPLSDAPlot <<- "BCoeffs"
+    )
+    
+    
+    observe({
+      input$PLSDABCoeffPlot
+      if (whichPLSDAPlot=="BCoeffs"){
+        isolate({
+          if (input$AggregOpForPLSDA == "concatenate"){
+            x_id=plsdaFit[[1]]$coefnames
+            x_id=strsplit(x_id,"_")
+            N_xlabels <- length(x_id)
+            x_id=unlist(x_id)
+            x_cls=x_id[seq(1,2*N_xlabels,2)]
+            xlabels=as.numeric(x_id[seq(2,2*N_xlabels,2)])
+            nc=plsdaFit[[1]]$bestTune$ncomp
+           
+            df=data.frame(Cl=x_cls, 
+                          xlabs=as.numeric(xlabels))
+            for (k in 1:length(plsdaFit[[1]]$levels)){
+              eval(parse(text=paste0("tt=data.frame(",plsdaFit[[1]]$levels[k],"=plsdaFit[[1]]$finalModel$coefficients[,k,nc])")))
+              df = cbind(df,tt)
+            }
+            
+            df1 <- tidyr::gather(data=df,key="Class",value,-Cl,-xlabs)
+            
+            p <- ggplot2::ggplot(df1, ggplot2::aes(x=xlabs,y=value,colour=Class))+
+              ggplot2::geom_smooth() + ggplot2::facet_wrap(~Cl, ncol=1,scales="free_y")
+            
+          }else
+          {
+            coeffs <- lapply(plsdaFit, function(x) coef(x$finalModel))
+            nom_lesX <- as.list(input$XsForPLSDA)
+            lesNoms <- sapply(strsplit(unlist(nom_lesX),'_'),"[[",1)
+            wl <- lapply(as.list(nom_lesX), function(ii) as.numeric(All_XData_p[[ii]][1,-1]))
+            plotframe<-cbind(as.data.frame(coeffs[[1]][,,1]),
+                             data.frame(wl=wl[[1]],
+                                        source=rep(lesNoms[1],length(wl[[1]]))))
+            N_Classes<-ncol(coeffs[[1]])
+            colnames(plotframe)[1:N_Classes]<-colnames(coeffs[[1]])
+            if (length(wl)>1){
+              for (k in (2:length(wl))){
+                dum<-cbind(coeffs[[k]][,,1],
+                           data.frame(wl=wl[[k]],
+                                      source=rep(lesNoms[k],length(wl[[k]]))))
+                colnames(dum)[1:N_Classes]<-colnames(plotframe)[1:N_Classes]
+                plotframe<-rbind(plotframe,dum)
+              }
+            }
+            dum<-reshape2::melt(plotframe,id.vars=(N_Classes+c(1,2)),
+                                variable.name="Class",
+                                value.name="B_coeffs")
+            p <- ggplot2::ggplot(dum,ggplot2::aes(x=wl,y=B_coeffs,colour=Class))
+            p <- p + ggplot2::geom_smooth() + ggplot2::facet_wrap(~source, ncol=1,scales="free_y")
+          }
+          
+          output$PLSDAPlots <- renderPlotly((
+            ggplotly(p)
+          ))
+          
+        })
+      }
+    })
+    
+    # *********************************************************************
+    
+    ## Reacts to ShowPLSDAPredTable button ----
+    observeEvent(input$ShowPLSDAPredTable,{
+      
+      pr<-Predict_plsda(input$AggregOpForPLSDA, plsdaFit,plsda_set,probs=TRUE)
+      pr<-round(pr,2)
+      lesdiffs<-t(apply(pr,1,sort,decreasing=TRUE))
+      lesdiffs<-lesdiffs[,1]-lesdiffs[,2]
+      lescl<-Predict_plsda(input$AggregOpForPLSDA,plsdaFit,plsda_set,probs=FALSE)
+      letest <- lescl==plsda_set[[1]][,1]
+      pr<-data.frame(NoSeq=Ys_df$NoSeq,
+                     EchID=Ys_df[,1],
+                     True_Cl=plsda_set[[1]][,1],
+                     Pred_Cl=lescl,
+                     Test=letest,
+                     minDiff=lesdiffs,pr)
+      output$PlsDAPredTable = renderDataTable(pr,
+                                              filter='top')
+    })
+    
+    # *********************************************************************
+    
+    ## Reacts to Save button on modal PlsDAPredTable ----
+    observeEvent(input$savePLSDAPreds ,{
+      pr<-Predict_plsda(input$AggregOpForPLSDA, plsdaFit,plsda_set,probs=TRUE)
+      pr<-round(pr,2)
+      lesdiffs<-t(apply(pr,1,sort,decreasing=TRUE))
+      lesdiffs<-lesdiffs[,1]-lesdiffs[,2]
+      lescl<-Predict_plsda(input$AggregOpForPLSDA,plsdaFit,plsda_set,probs=FALSE)
+      letest <- lescl==plsda_set[[1]][,1]
+      pr<-data.frame(NoSeq=Ys_df$NoSeq,
+                     EchID=Ys_df[,1],
+                     True_Cl=plsda_set[[1]][,1],
+                     Pred_Cl=lescl,
+                     Test=letest,
+                     minDiff=lesdiffs,pr)
+      outfile=choose.files(caption="Define file name",
+                           multi=FALSE, 
+                           filters=Filters[c("txt"),])
+      utils::write.table(pr,
+                         file=outfile,
+                         sep="\t",
+                         dec=".",
+                         row.names = FALSE,
+                         quote=FALSE)
+      
+    })
+    
+    # *********************************************************************
+    
+    ## Reacts to save PLSDA model button ----
+    observe({
+      volumes <- c("UserFolder"=fs::path_home())
+      shinyFileSave(input, "FSavePLSDA", roots=volumes, session=session)
+      fileinfo <- parseSavePath(volumes, input$FSavePLSDA)
+      if (nrow(fileinfo) > 0) {
+        leFichier <- fileinfo$datapath
+        PP_params <- collectPreProParams(PPvaluesTrunc,input)
+        
+        #Need to remove some as not all XDataList members are in XsForPLS
+        toRemove <- setdiff(PP_params$lesNoms,input$XsForPLSDA)
+        removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
+        PP_params$lesNoms <- as.list(input$XsForPLSDA)
+        i <- 0
+        lapply(toRemove, function(id){
+          i <<- i+1
+          PP_params$trunc_limits <<- PP_params$trunc_limits[-removeInd[i],]
+          PP_params$perSpecParams[[id]] <<- NULL
+          PP_params$savgolParams$doSavGol[[id]] <<- NULL
+          PP_params$savgolParams$w[[id]] <<- NULL
+          PP_params$savgolParams$p[[id]] <<- NULL
+          PP_params$savgolParams$m[[id]] <<- NULL
+        })
+        model_descript <- list(
+          type = "PLSDA",
+          description = input$PLSDADescript,
+          datatype = input$XsForPLSDA,
+          aggregation = input$AggregOpForPLSDA
+        )
+        pls_ncomp <- lapply(plsdaFit,function(x) x$bestTune$ncomp)
+        
+        save(model_descript,PP_params,plsFit,pls_ncomp,file=leFichier) 
+      }
+    })
     
 })
       

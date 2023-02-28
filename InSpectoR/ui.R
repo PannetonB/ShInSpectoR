@@ -21,7 +21,7 @@ library(reactlog)
 library(ggplot2)
 library(ggthemes)
 library(pls)
-reactlog_enable()
+library(waiter)
 
 # Define UI for application that draws a histogram
 
@@ -29,6 +29,7 @@ reactlog_enable()
 
 shinyUI(fluidPage(
     useShinyjs(),
+    use_waiter(),
     ##Darker horizontal line ----
     tags$head(
         tags$style(HTML("hr {border-top: 1px solid #000000;}")),
@@ -201,8 +202,8 @@ shinyUI(fluidPage(
                                                         choices = as.character(seq(0.5,0.85,0.05)),
                                                         selected = "0.6"),
                                             selectInput("ResamplingForPLSDA", 'Resampling method',
-                                                        choices=c('None','CV','RepeatedCV','LOO'),
-                                                        selected='CV'),
+                                                        choices=c('none','cv','repeatedcv','LOOCV'),
+                                                        selected='cv'),
                                             selectInput("NbFoldsForPLSDA","Number of folds",
                                                         choices=as.character(2:10),
                                                         selected=3),
@@ -226,19 +227,12 @@ shinyUI(fluidPage(
                                        selectInput('AggregOpForPLSDA','Aggregation operator',
                                                    choices=c("concatenate","median","max","prod","mean")),
                                        hr(),
-                                       actionButton('ComputePLSDA',strong("Compute model")),
-                                       shinySaveButton("FSavePLSDA", strong("Save model"),
-                                                       "Save PLS model to file", 
-                                                       filetype=list(RData="RData")),
-                                       h4(strong('Infos for saving PLSDA model')),
-                                       textAreaInput('PLSDADescript', "Short description", 
-                                                     value="Description",
-                                                     width="600px", height="auto")
+                                       actionButton('ComputePLSDA',strong("Compute model"))
                           ),
                           
                           
                           mainPanel(width = 9,
-                                    column(1,
+                                    column(2,
                                            actionButton('PLSDAvalidationPlot', strong('Plot validation')),
                                            hr(),
                                            actionButton('PLSDAConfMatPlot', strong('Plot confusion matrix')),
@@ -248,14 +242,24 @@ shinyUI(fluidPage(
                                            radioButtons('PLSDATrainTestBut', 'Select model type',
                                                         choices=c('Validation','Test')),
                                            hr(),
+                                           actionButton('PLSDABCoeffPlot', strong('Plot B-coeffs')),
+                                           hr(),
                                            actionButton('ShowPLSDAPredTable',strong("Show prediction table")),
                                            bsModal("PLSDAPreds", "PLSDA predictions",
                                                    "ShowPLSDAPredTable", size = "large",
                                                    dataTableOutput("PlsDAPredTable"),
-                                                   actionButton('savePLSDAPreds','Save'))
+                                                   actionButton('savePLSDAPreds','Save')),
+                                           hr(),
+                                           shinySaveButton("FSavePLSDA", strong("Save model"),
+                                                           "Save PLS model to file", 
+                                                           filetype=list(RData="RData")),
+                                           h4(strong('Infos for saving PLSDA model')),
+                                           textAreaInput('PLSDADescript', "Short description", 
+                                                         value="Description",
+                                                         width="600px", height="auto")
                                            
                                     ),
-                                    column(10, offset=1, 
+                                    column(9, offset=1, 
                                            plotlyOutput("PLSDAPlots", 
                                                         height="600px",
                                                         width="auto"

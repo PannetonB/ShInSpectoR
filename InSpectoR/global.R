@@ -13,7 +13,8 @@ XDataList <<- character()   #List of current spectra types
 ALLXDataList <<- character() #List of loaded spectra types
 RayleighCutoffs <<- list() #where to cut to eliminate Rayleigh in fluorescence
                            #one element per element in All_XData with same names.
-whichPLSPlot <<- "Error"
+whichPLSPlot <<- "none"
+whichPLSDAPlot <<- "none"
 
 ## In Shiny app ----
 
