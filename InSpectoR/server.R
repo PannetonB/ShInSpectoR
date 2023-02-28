@@ -61,6 +61,8 @@ shinyServer(function(input, output, session) {
         #In case user did not apply prepros
         preproParams <- collectPreProParams(PPvaluesTrunc,input)
         Apply_PrePro(preproParams)
+        lesChoix <- computePCAonRaw(as.numeric(input$npcs),doRayleigh = FALSE)
+        
         #Force redraw
         s <- unique(input$Ys_rows_selected)
         if (!is.null(s)){
@@ -415,7 +417,8 @@ shinyServer(function(input, output, session) {
             #                                      min(All_XData_p[[iii]][1,-1]))),
             LowerLimit = unlist(RayleighCutoffs[XDataList]),
             HigherLimit = unlist(lapply(as.list(XDataList), function(iii)
-              max(All_XData[[iii]][1,-1])))
+              max(All_XData[[iii]][1,-1]))),
+            RayleighCutoffs = unlist(RayleighCutoffs[XDataList])
           )
           dtable <- datatable(truncDF,rownames = F, width='800px',
                               options = list(dom = 't',
@@ -627,23 +630,29 @@ shinyServer(function(input, output, session) {
       row  <- input$PreProsTrunc_cell_edit$row
       clmn <- input$PreProsTrunc_cell_edit$col+1
       laVal <- as.numeric(input$PreProsTrunc_cell_edit$value)
-      # First make sure it is within limits of the raw spectra
-      # wvLimits <- range(All_XData_p[[row]][1,-1])  #RayleighCutoffs
-      wvLimits <- range(All_XData[[XDataList[[row]]]][1,-1])    #Raw wavelenght range
-      if (!between(laVal,wvLimits[1],wvLimits[2])){ #not in limit
-        laVal <- PPvaluesTrunc$dfWorking$x$data[row, clmn]
+      if (clmn<3) {
+        # First make sure it is within limits of the raw spectra
+        # wvLimits <- range(All_XData_p[[row]][1,-1])  #RayleighCutoffs
+        wvLimits <- range(All_XData[[XDataList[[row]]]][1,-1])    #Raw wavelenght range
+        if (!between(laVal,wvLimits[1],wvLimits[2])){ #not in limit
+          laVal <- PPvaluesTrunc$dfWorking$x$data[row, clmn]
+        }
+  
+        # Check waveband norm. parameters and update
+        PPvaluesTrunc$dfWorking$x$data[row, clmn] <- laVal
+        lowWL <- PPvaluesTrunc$dfWorking$x$data[row, 2]
+        hiWL <- PPvaluesTrunc$dfWorking$x$data[row, 3]
+        id <- paste0(inserted_perSpectrumOptions()[row],"_C")
+        WBand <- input[[id]]
+        ctr <- round((hiWL+lowWL)/2)
+        #Update values for ctr and waveband
+        id <- paste0(inserted_perSpectrumOptions()[row],"_B")
+        updateNumericInput(session,id,value=ctr,min=lowWL+WBand,max=hiWL-WBand)
+      }else
+      {
+        PPvaluesTrunc$dfWorking$x$data[row, clmn] <- laVal
+        RayleighCutoffs[[inserted_perSpectrumOptions()[row]]] <<- laVal
       }
-
-      # Check waveband norm. parameters and update
-      PPvaluesTrunc$dfWorking$x$data[row, clmn] <- laVal
-      lowWL <- PPvaluesTrunc$dfWorking$x$data[row, 2]
-      hiWL <- PPvaluesTrunc$dfWorking$x$data[row, 3]
-      id <- paste0(inserted_perSpectrumOptions()[row],"_C")
-      WBand <- input[[id]]
-      ctr <- round((hiWL+lowWL)/2)
-      #Update values for ctr and waveband
-      id <- paste0(inserted_perSpectrumOptions()[row],"_B")
-      updateNumericInput(session,id,value=ctr,min=lowWL+WBand,max=hiWL-WBand)
       output$PreProsTrunc <- renderDataTable({
         PPvaluesTrunc$dfWorking
       })
