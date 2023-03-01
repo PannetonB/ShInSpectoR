@@ -5,7 +5,7 @@ PCAsDT <<- list()  #PCAs of all spectrum types in XDataList
 PCAsdt_dds <<- list()   #Score and Outside distances of PCAs 
 PCAsdt_dds_crit <<- list()  #Limits for PCAs_dds
 All_XData <<- list()  #Current set of spectra, one type per element of list
-All_XData_p <<- list()  #Current set of preprocessed spectra, one type per element of list
+XData_p <<- list()  #Current set of preprocessed spectra, one type per element of list
 ORI_XData <<- list()  #As in file set of spectra
 Ys_df <<- data.frame(ID=character(0))  #Current Ys 
 ORI_Ys_df <<- data.frame()   #As in file Ys
@@ -90,7 +90,7 @@ Apply_PrePro <- function(preproParams)
   
   lapply(lesNoms,function(leNom){
     wl<-All_XData[[leNom]][1,-1]
-    All_XData_p[[leNom]] <<- All_XData[[leNom]][,c(TRUE,
+    XData_p[[leNom]] <<- All_XData[[leNom]][,c(TRUE,
                                                    ((wl>=trunc_limits[leNom,1]) & (wl<=trunc_limits[leNom,2])))]
   }) 
   
@@ -103,11 +103,11 @@ Apply_PrePro <- function(preproParams)
     if (length(typePerSpec==1)){
       switch(typePerSpec,
              closure = {
-               dum <- normLigne(All_XData_p[[leNom]])
-               All_XData_p[[leNom]] <<-dum  
+               dum <- normLigne(XData_p[[leNom]])
+               XData_p[[leNom]] <<-dum  
              },
              waveband ={
-               wl <- All_XData_p[[leNom]][1,-1]
+               wl <- XData_p[[leNom]][1,-1]
                ctr <- as.numeric(perSpecParams[[leNom]][2])
                band <- as.numeric(perSpecParams[[leNom]][3])
                halfband <- floor(band/2)
@@ -115,10 +115,10 @@ Apply_PrePro <- function(preproParams)
                i2 <- ctr+halfband
                i1 <- which.min(abs(i1-wl))
                i2 <- which.min(abs(i2-wl))
-               dats <- All_XData_p[[leNom]][-1,-1]
+               dats <- XData_p[[leNom]][-1,-1]
                L <- ncol(dats)
                dats <- t(apply(dats,1,function(z) z/mean(z[i1:i2])))
-               All_XData_p[[leNom]][-1,-1] <<- dats
+               XData_p[[leNom]][-1,-1] <<- dats
              })
     }
   })
@@ -135,13 +135,13 @@ Apply_PrePro <- function(preproParams)
         
         #Adjust length because savGolay truncates
         w_2=floor(w/2)
-        wl<- All_XData_p[[leNom]][1,-1] # a list of wl vector, one per spectrum type
+        wl<- XData_p[[leNom]][1,-1] # a list of wl vector, one per spectrum type
         wl <- wl[(w_2+1):(length(wl)-w_2)]
         
-        X <- All_XData_p[[leNom]][-1,-1]
+        X <- XData_p[[leNom]][-1,-1]
         X <- prospectr::savitzkyGolay(X,m,p,w)
         X <- rbind(wl,X) #rebuild matrices with wl
-        All_XData_p[[leNom]] <<- cbind(All_XData_p[[leNom]][,1],X)
+        XData_p[[leNom]] <<- cbind(XData_p[[leNom]][,1],X)
       }
     })
   }
@@ -151,7 +151,7 @@ Apply_PrePro <- function(preproParams)
 
 computePCAsDT <- function(nCP,dum, leNom)
   # nCP: number of PC desired
-  # dum: an element of All_XData_p
+  # dum: an element of XData_p
   # leNom : name of dum
 {
   dats <- dum[-1,-1]
@@ -260,7 +260,7 @@ doPCA <- function(dats){
 
 
 normLigne <- function(dum)
-    # dum: an element of All_XData_p
+    # dum: an element of XData_p
 {
   dats <- dum[-1,-1]
   L <- ncol(dats)

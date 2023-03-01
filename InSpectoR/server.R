@@ -100,7 +100,7 @@ shinyServer(function(input, output, session) {
         if (length(s)) {
             mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
             s <- sort(s)
-            dfs_plotly <- dfForPlotly(XDataList,All_XData_p,s)
+            dfs_plotly <- dfForPlotly(XDataList,XData_p,s)
             p <- plotly::plot_ly(dfs_plotly,x=~X,y=~Spectra,
                                  color = ~ID, colors = mycolors,
                                  type = 'scatter', mode = 'lines',
@@ -414,7 +414,7 @@ shinyServer(function(input, output, session) {
           truncDF <- data.frame(
             Spectra = XDataList,
             # LowerLimit = unlist(lapply(as.list(XDataList), function(iii)
-            #                                      min(All_XData_p[[iii]][1,-1]))),
+            #                                      min(XData_p[[iii]][1,-1]))),
             LowerLimit = unlist(RayleighCutoffs[XDataList]),
             HigherLimit = unlist(lapply(as.list(XDataList), function(iii)
               max(All_XData[[iii]][1,-1]))),
@@ -523,8 +523,8 @@ shinyServer(function(input, output, session) {
                 All_XData[[k]] <<- All_XData[[k]][-(1+lesRows),]
             }
             
-            for (k in 1:length(All_XData_p)){
-              All_XData_p[[k]] <<- All_XData_p[[k]][-(1+lesRows),]
+            for (k in 1:length(XData_p)){
+              XData_p[[k]] <<- XData_p[[k]][-(1+lesRows),]
             }
             lesChoix <- computePCAonRaw(as.numeric(input$npcs),doRayleigh=FALSE)
         }
@@ -566,7 +566,7 @@ shinyServer(function(input, output, session) {
             wv <- All_XData[[leNom]][1,-1]
             i1 <- which(All_XData[[leNom]][1,-1]==RayleighCutoffs[leNom])
             i2 <- which(All_XData[[leNom]][1,-1]==max(wv))
-            if (!is.null(All_XData_p[[leNom]])) All_XData_p[[leNom]] <<- All_XData[[leNom]][,1+c(0,i1:i2)]
+            if (!is.null(XData_p[[leNom]])) XData_p[[leNom]] <<- All_XData[[leNom]][,1+c(0,i1:i2)]
         }
         
         
@@ -632,7 +632,7 @@ shinyServer(function(input, output, session) {
       laVal <- as.numeric(input$PreProsTrunc_cell_edit$value)
       if (clmn<3) {
         # First make sure it is within limits of the raw spectra
-        # wvLimits <- range(All_XData_p[[row]][1,-1])  #RayleighCutoffs
+        # wvLimits <- range(XData_p[[row]][1,-1])  #RayleighCutoffs
         wvLimits <- range(All_XData[[XDataList[[row]]]][1,-1])    #Raw wavelenght range
         if (!between(laVal,wvLimits[1],wvLimits[2])){ #not in limit
           laVal <- PPvaluesTrunc$dfWorking$x$data[row, clmn]
@@ -801,7 +801,7 @@ shinyServer(function(input, output, session) {
                             choices = lesChoix[-1])
           
           
-          #Perform pre-processing so All_XData_p is inline with prepro options
+          #Perform pre-processing so XData_p is inline with prepro options
           #Useful in case user did not Apply prepros
           preproParams <- collectPreProParams(PPvaluesTrunc,input)
           Apply_PrePro(preproParams)
@@ -895,9 +895,9 @@ shinyServer(function(input, output, session) {
       if (aggr=="Concatenate spectra"){
         y <- data.frame(V1=Ys_df[[YName]])
         for (k in XNames){
-          spdf<-as.data.frame(All_XData_p[[k]][-1,-1])
+          spdf<-as.data.frame(XData_p[[k]][-1,-1])
           pre <- strsplit(k,"_")[[1]][1]
-          colnames(spdf)<-paste(pre,as.character(All_XData_p[[k]][1,-1]),sep="_")
+          colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
           y <- cbind(y,spdf)
         }
         pls_set <<- list(y)
@@ -1176,13 +1176,13 @@ shinyServer(function(input, output, session) {
                             selected = lesChoix[1])
           
           
-          #Perform pre-processing so All_XData_p is inline with prepro options
+          #Perform pre-processing so XData_p is inline with prepro options
           #Useful in case user did not Apply prepros
           preproParams <- collectPreProParams(PPvaluesTrunc,input)
           Apply_PrePro(preproParams)
           
           #Computes PCA on first spectrum in input$X to start with
-          doPCA(All_XData_p[[input$Xs[1]]])
+          doPCA(XData_p[[input$Xs[1]]])
           
           updateSelectInput(session, 'PCATopPlotType',
                               selected = 'Screeplot')
@@ -1301,9 +1301,9 @@ shinyServer(function(input, output, session) {
       req(input$XsforPCA)
       y <- NULL
       for (k in input$XsforPCA){
-        spdf<-as.data.frame(All_XData_p[[k]][,-1])
+        spdf<-as.data.frame(XData_p[[k]][,-1])
         pre <- strsplit(k,"_")[[1]][1]
-        colnames(spdf)<-paste(pre,as.character(All_XData_p[[k]][1,-1]),sep="_")
+        colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
         if (is.null(y)){
           y <- spdf
         }else
@@ -1457,17 +1457,17 @@ shinyServer(function(input, output, session) {
       if (input$AggregOpForPLSDA=="concatenate"){
         #ATTN : do not work with XData_p but with the selected items.
         for (k in Xs){
-          spdf<-as.data.frame(All_XData_p[[k]][-1,-1])
+          spdf<-as.data.frame(XData_p[[k]][-1,-1])
           pre <- strsplit(k,"_")[[1]][1]
-          colnames(spdf)<-paste(pre,as.character(All_XData_p[[k]][1,-1]),sep="_")
+          colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
           Ys <- cbind(Ys,spdf)
         }
         plsda_set <<- list(Ys)
       }else
       {
         plsda_set <<- lapply(as.list(Xs), function(ii){
-          y<-data.frame(Cl1=Ys ,All_XData_p[[ii]][-1,-1])
-          colnames(y)[-1]<-as.character(All_XData_p[[ii]][1,-1])
+          y<-data.frame(Cl1=Ys ,XData_p[[ii]][-1,-1])
+          colnames(y)[-1]<-as.character(XData_p[[ii]][1,-1])
           return(y)
         })
       }
@@ -1476,7 +1476,7 @@ shinyServer(function(input, output, session) {
       
       
       lambdas<-lapply(Xs, function(ii){
-        return(All_XData_p[[ii]][1,-1])
+        return(XData_p[[ii]][1,-1])
       })
       
       training <- lapply(plsda_set, function(x) x[plsda_inTrain,])
@@ -1772,7 +1772,7 @@ shinyServer(function(input, output, session) {
             coeffs <- lapply(plsdaFit, function(x) coef(x$finalModel))
             nom_lesX <- as.list(input$XsForPLSDA)
             lesNoms <- sapply(strsplit(unlist(nom_lesX),'_'),"[[",1)
-            wl <- lapply(as.list(nom_lesX), function(ii) as.numeric(All_XData_p[[ii]][1,-1]))
+            wl <- lapply(as.list(nom_lesX), function(ii) as.numeric(XData_p[[ii]][1,-1]))
             plotframe<-cbind(as.data.frame(coeffs[[1]][,,1]),
                              data.frame(wl=wl[[1]],
                                         source=rep(lesNoms[1],length(wl[[1]]))))
