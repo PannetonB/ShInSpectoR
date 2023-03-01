@@ -1348,7 +1348,8 @@ shinyServer(function(input, output, session) {
       shinyFileSave(input, "PCAModelSave", roots=volumes, session=session)
       fileinfo <- parseSavePath(volumes, input$PCAModelSave)
       if (nrow(fileinfo) > 0){
-        shortNames <- lapply(strsplit(input$XsforPCA,"_"), function(x) x[1])
+        nom_lesX <- input$XsforPCA
+        shortNames <- sapply(strsplit(nom_lesX,'_'),"[[",1)
         model_descript=list(type="PCA",
                             description=input$PCADescript,
                             datatype=shortNames)
@@ -1358,14 +1359,14 @@ shinyServer(function(input, output, session) {
         pca2<-pr_2_prin(lePCA)
         #Compute score and orthogonal distances
         dds <- chemometrics::pcaDiagplot(dat_4_PCA,
-                                    pca2,a=input$NPCsforPCA,
+                                    pca2,a=as.numeric(input$NPCsforPCA),
                                     plot=FALSE,scale=FALSE)
           
         PP_params <- collectPreProParams(PPvaluesTrunc,input)
         
         toRemove <- setdiff(PP_params$lesNoms,input$XsforPCA)
         removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
-        PP_params$lesNoms <- as.list(input$XsForPLS)
+        PP_params$lesNoms <- as.list(input$XsforPCA)
         i <- 0
         lapply(toRemove, function(id){
           i <<- i+1
