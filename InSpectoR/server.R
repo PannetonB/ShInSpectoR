@@ -287,7 +287,7 @@ shinyServer(function(input, output, session) {
         Ys_df <<- read.table(file=inFile$datapath[indi],header=TRUE,sep="\t",dec=".",
                              na.strings = "", stringsAsFactors = T)
         #make.unique to deal with repeated sample ID.
-        Ys_df[,1] <- as.factor(make.unique(as.character(Ys_df[,1])))
+        Ys_df[,1] <<- as.factor(make.unique(as.character(Ys_df[,1])))
         Ys_df <<- cbind(Ys_df,data.frame(NoSeq=seq(1:nrow(Ys_df))))
         ORI_Ys_df <<- Ys_df
         #load all XData in All_XData
@@ -1521,15 +1521,15 @@ shinyServer(function(input, output, session) {
       
       if (input$ResamplingForPLSDA == 'repeatedcv'){
         ctrl<-caret::trainControl(method = input$ResamplingForPLSDA,
-                                  number=input$NbFoldsForPLSDA,
-                                  repeats=input$NbRepetitionsForPLSDA,
+                                  number=as.integer(input$NbFoldsForPLSDA),
+                                  repeats=as.integer(input$NbRepetitionsForPLSDA),
                                   classProbs = TRUE,
                                   returnData = TRUE,
                                   allowParallel = TRUE)
       }else
       {
         ctrl<-caret::trainControl(method = input$ResamplingForPLSDA,
-                                  number=input$NbFoldsForPLSDA,
+                                  number=as.integer(input$NbFoldsForPLSDA),
                                   classProbs = TRUE,
                                   returnData = TRUE,
                                   allowParallel = TRUE)
