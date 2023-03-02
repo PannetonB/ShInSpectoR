@@ -1538,10 +1538,6 @@ shinyServer(function(input, output, session) {
       
       
       #Fitting model - This may take some time
-      output$PLSDAConsole <- renderPrint({
-        dum <- "COMPUTING MODEL - WAIT..."
-        write(dum, file="")
-      })
       
       if (input$PreproForPLSDA=="None"){
         prepro<-NULL
@@ -1938,12 +1934,26 @@ shinyServer(function(input, output, session) {
           
         })
         output$modelType <- renderText("No model selected")
+        output$modelDescOnApply <- renderText("No model selected")
+        output$dataTypeOnApply <- renderText("No model selected")
       }
-      output$modelDescOnApply <- renderText("No model selected")
       
       shinyjs::hide("applyModel")
       shinyjs::hide("saveModelResults")
       
+    })
+    
+    # *********************************************************************
+    
+    ## Reacts to FLoadModel button ----
+    observe({
+      volumes <- c("UserFolder"=fs::path_home())
+      shinyFileChoose(input, "FLoadModel", roots=volumes, session=session)
+      fileinfo <<- parseFilePaths(volumes, input$FLoadModel)
+      if (nrow(fileinfo) > 0){
+        leFichier <- fileinfo$datapath
+        load(file=leFichier, envir = globalenv()) 
+      }
     })
     
 })

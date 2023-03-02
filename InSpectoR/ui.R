@@ -419,7 +419,10 @@ shinyUI(fluidPage(
                                          textOutput("modelType"),
                                          h4("Model description"),
                                          verbatimTextOutput('modelDescOnApply',
-                                                            placeholder = T),   
+                                                            placeholder = T),
+                                         h4("Spectrum type requirements"),
+                                         verbatimTextOutput('dataTypeOnApply',
+                                                            placeholder = T),
                                          hr(),
                                          actionButton("applyModel","Apply"),
                                          actionButton("saveModelResults","Save results")
