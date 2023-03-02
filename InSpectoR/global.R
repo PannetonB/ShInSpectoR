@@ -24,7 +24,16 @@ mesCouleurs <- paletteer::paletteer_d("Polychrome::palette36")
 
 
 #***********************************************************************
+chargeLibs <- function(lesLibrairies)
+{
+  i1 <- !(lesLibrairies %in% row.names(installed.packages()))
+  if(any(i1)) {
+    install.packages(lesLibrairies[i1], dependencies = TRUE) 
+  }
+  lapply(lesLibrairies, require, character.only = TRUE)
+}
 
+#***********************************************************************
 
 collectPreProParams <- function(PPValuesTrunc,input){
   

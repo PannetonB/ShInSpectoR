@@ -1,9 +1,10 @@
 #
-#Server for ShInSpectoR
+#Server for ShInSpectoR# Load libraries ----
+
+
 
 shinyServer(function(input, output, session) {
-  
-    
+ 
 
     # To make modal window for loading plots draggable ----
     jqui_draggable('#modalExample')
@@ -466,10 +467,9 @@ shinyServer(function(input, output, session) {
                               numericInput(paste0(id,"_B"), "Band Center",ctr,
                                            lowWL,hiWL,1),
                               numericInput(paste0(id,"_C"), 'Bandwidth', 1,1,25,2),
-                              h3(' '),
                               checkboxInput(paste0(id,"_D"), strong('SAVITSKY-GOLAY'), FALSE, width='20px'),
                               numericInput(paste0(id,'_E'), 'Bandwidth',5,5,25,2),
-                              numericInput(paste0(id,'_F'), 'Polynomial order',3,2,10,1),
+                              numericInput(paste0(id,'_F'), 'Polynomial order',3,1,10,1),
                               numericInput(paste0(id,'_G'), 'Derivative order',0,0,2,1)
                               
                               

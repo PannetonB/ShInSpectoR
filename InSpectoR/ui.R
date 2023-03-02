@@ -7,23 +7,30 @@
 #    http://shiny.rstudio.com/
 #
 
-# Load libraries ----
-library(shiny)
-library(shinyjs)
-library(shinyBS)
-library(shinyFiles)
-library(DT)
-library(plotly)
-library(dplyr)
-library(shinyjqui)
-library(rhandsontable)
-library(reactlog)
-library(ggplot2)
-library(ggthemes)
-library(pls)
-library(waiter)
-
 # Define UI for application that draws a histogram
+
+
+
+# Load libraries ----
+
+lesLibrairies <-
+  c(  "shiny",
+      "shinyjs",
+      "shinyBS",
+      "shinyFiles",
+      "DT",
+      "plotly",
+      "dplyr",
+      "shinyjqui",
+      "rhandsontable",
+      "reactlog",
+      "ggplot2",
+      "ggthemes",
+      "pls",
+      "waiter"
+  )
+
+chargeLibs(lesLibrairies)
 
 # The interface ----
 
