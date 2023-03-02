@@ -21,13 +21,17 @@ shinyServer(function(input, output, session) {
     #Hide some UI elements
     shinyjs::hide("PLSDescript")
     shinyjs::hide("FSavePLS")
+    shinyjs::hide("FSavePLSDA")
+    shinyjs::hide("PLSDADescript")
+    shinyjs::hide("applyModel")
+    shinyjs::hide("saveModelResults")
     # *********************************************************************
     
     
     # Defines table contents as reactive and create proxys ----
     ## On Data tab ----
     Yvalues <- reactiveValues(dfWorking = Ys_df)
-    output$Ys <- renderDataTable({
+    output$Ys <- renderDT({
       Yvalues$dfWorking
     })
     proxy_Ys = dataTableProxy('Ys')
@@ -354,9 +358,13 @@ shinyServer(function(input, output, session) {
         dtable <- DT::datatable(Ys_df, width = '900px',
                                 options=list(
                                     autoWidth=FALSE,
+                                    dom = "<lf<\"datatables-scroll\"t>ipr>",
+                                    rownames = FALSE,
+                                    class="compact",
                                     lengthMenu = list(c(10, 15, 20, -1), c('10', '15', '20','All')),
                                     pageLength = 10,
-                                    scrollX = TRUE,
+                                    # scrollX = TRUE,
+                                    style = "bootstrap",
                                     columnDefs = list(
                                       list(orderable = TRUE, targets = 0),
                                       list(width = '15px', targets = 0),
@@ -509,7 +517,27 @@ shinyServer(function(input, output, session) {
         proxy_Ys %>% selectRows(NULL)
     })
     
+    
     # *********************************************************************
+    
+    ## Reacts to selectAll button ----
+    observeEvent(input$selectAll, {
+      rangees <- input$Ys_rows_all
+      proxy_Ys %>% selectRows(rangees)
+    })
+    
+    
+    # *********************************************************************
+    
+    ## Reacts to clearAllFilters button ----
+    observeEvent(input$clearAllFilters, {
+      rangees <- input$Ys_rows_all
+      proxy_Ys %>% clearSearch()
+    })
+    
+    
+    # *********************************************************************
+    
     
     ## Reacts to deleteRows button ----
     observeEvent(input$deleteRows, {
@@ -1886,6 +1914,36 @@ shinyServer(function(input, output, session) {
         
         save(model_descript,PP_params,plsFit,pls_ncomp,file=leFichier) 
       }
+    })
+    
+    
+    
+    # *********************************************************************
+    
+    # Apply tab ----
+    ## Reacts to apply tab activation ----
+    observeEvent(input$tabs,{
+      if(input$tabs == "Apply models"){ #set up the pages
+        
+        output$modelTable <-   renderDataTable(
+          datatable(data.frame(Note="TABLE OUTPUT AREA"))
+        )
+        output$modelPlot <- renderPlotly({
+          text = "PLOT OUTPUT AREA"
+          ggplotly(
+            ggplot() + 
+              annotate("text", x = 4, y = 25, size=8, label = text) + 
+              theme_void()
+          )
+          
+        })
+        output$modelType <- renderText("No model selected")
+      }
+      output$modelDescOnApply <- renderText("No model selected")
+      
+      shinyjs::hide("applyModel")
+      shinyjs::hide("saveModelResults")
+      
     })
     
 })

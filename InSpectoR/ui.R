@@ -40,7 +40,27 @@ shinyUI(fluidPage(
     ##Darker horizontal line ----
     tags$head(
         tags$style(HTML("hr {border-top: 1px solid #000000;}")),
-        tags$style(HTML("table {table-layout: fixed;}"))    #For setting column widths,
+        #For setting column widths,
+        tags$style(HTML("table {table-layout: fixed;}")),
+        #For x scroll fix in datatable filtering
+        tags$style("
+              .datatables-scroll {
+                overflow-x: auto;
+                width: 100%;
+                max-height: 500px;
+              }
+              .datatables-scroll .dataTable thead tr th,
+              .datatables-scroll thead tr td {
+                position: sticky;
+                background-color: #FFFFFF;
+              }
+              .datatables-scroll thead tr th {
+                top: 0;
+              }
+              .datatables-scroll thead tr td {
+                top: 2.45em;
+              }
+            ")
         
     ),
 
@@ -84,7 +104,7 @@ shinyUI(fluidPage(
                             selectInput("pcaPtColorBy", "Pick factor for point coloring",
                                         choices="ID", multiple=F),
                             actionButton('plotloadings', 'Plot loadings')
-                            ),
+                        ),
                         
                         
                         mainPanel(width = 10,
@@ -93,10 +113,13 @@ shinyUI(fluidPage(
                                    actionButton('clearRows', 'Clear Selection'),
                                    actionButton("deleteRows", "Delete Selected Rows"),
                                    actionButton("restoreOriData", "Restore data set"),
+                                   hr(),
+                                   actionButton("selectAll","Select all shown"),
+                                   actionButton("clearAllFilters","Clear filters"),
                                    hr(style = "border-top: 1px solid #FFFFFF;"),
                                    fluidRow(DT::dataTableOutput('Ys',
                                                                 height='auto',
-                                                                width='900px'
+                                                                width='600px'
                                                                 )
                                             )
                                    ),
@@ -150,44 +173,45 @@ shinyUI(fluidPage(
                tabPanel("PCA",
                         sidebarLayout(
                           sidebarPanel(width=3,
-                                       h4(strong('Data options - spectra are concatenated')),
-                                       selectInput('XsforPCA','Spectrum types for PCA',
-                                                   choices=character(0L),multiple=T),
-                                       selectInput("NPCsforPCA", "Select number of PCs",
-                                                   choices=1:2),
-                                       hr(),
-                                       h4(strong('Plotting options')),
-                                       selectInput('PCATopPlotType','Choose plot type',
-                                                   choices = c('Scores','Loadings','Screeplot','OD_SD'),
-                                                   selected = 'Screeplot'),
-                                       selectInput('XAxisPCAPlot','Pick PC for X-axis score plot or 1rst loading',
-                                                   choices = paste0("PC",c(1:2)),
-                                                   selected="PC1"),
-                                       selectInput('YAxisPCAPlot','Pick PC for Y-axis score plot or 1rst loading',
-                                                   choices = paste0("PC",c(1:2)),
-                                                   selected="PC2"),
-                                       selectInput("PCAPlotColorBy", "Color by",
-                                                   choices=c()),
-                                       hr(),
-                                       h4(strong('Saving results')),
-                                       shinySaveButton("PCAScoresSave", strong("Save Scores"),
-                                                       "Define file name", 
-                                                       filetype=list(txt = "txt")),
-                                       shinySaveButton("PCAModelSave", strong("Save model"),
-                                                       "Define file name", 
-                                                       filetype=list(RData = "RDATA")),
-                                       h4(strong('Infos for saving PCA model')),
-                                       textAreaInput('PCADescript', "Short description", 
-                                                     value="Description",
-                                                     width="300px", height="150px")
+                                         h4(strong('Data options - spectra are concatenated')),
+                                         selectInput('XsforPCA','Spectrum types for PCA',
+                                                     choices=character(0L),multiple=T),
+                                         selectInput("NPCsforPCA", "Select number of PCs",
+                                                     choices=1:2),
+                                         hr(),
+                                         h4(strong('Plotting options')),
+                                         selectInput('PCATopPlotType','Choose plot type',
+                                                     choices = c('Scores','Loadings','Screeplot','OD_SD'),
+                                                     selected = 'Screeplot'),
+                                         selectInput('XAxisPCAPlot','Pick PC for X-axis score plot or 1rst loading',
+                                                     choices = paste0("PC",c(1:2)),
+                                                     selected="PC1"),
+                                         selectInput('YAxisPCAPlot','Pick PC for Y-axis score plot or 1rst loading',
+                                                     choices = paste0("PC",c(1:2)),
+                                                     selected="PC2"),
+                                         selectInput("PCAPlotColorBy", "Color by",
+                                                     choices=c()),
+                                         hr(),
+                                         h4(strong('Saving results')),
+                                         shinySaveButton("PCAScoresSave", strong("Save Scores"),
+                                                         "Define file name", 
+                                                         filetype=list(txt = "txt")),
+                                         shinySaveButton("PCAModelSave", strong("Save model"),
+                                                         "Define file name", 
+                                                         filetype=list(RData = "RDATA")),
+                                         h4(strong('Infos for saving PCA model')),
+                                         textAreaInput('PCADescript', "Short description", 
+                                                       value="Description",
+                                                       width="300px", height="150px")
                                        
                                        ),
                           mainPanel(width=9,
                                     plotlyOutput("PCATopPlot", 
                                                  height="800px",
-                                                 width="auto"
-                                    ),)
-                        )),
+                                                 width="auto")
+                                    )
+                         )
+                       ),
                
                ### PLSDA tab ----
                tabPanel("PLSDA",
@@ -235,7 +259,7 @@ shinyUI(fluidPage(
                                                    choices=c("concatenate","median","max","prod","mean")),
                                        hr(),
                                        actionButton('ComputePLSDA',strong("Compute model"))
-                          ),
+                               ),
                           
                           
                           mainPanel(width = 9,
@@ -276,113 +300,148 @@ shinyUI(fluidPage(
                                                 color:blue;
                                                 font-size:14px; 
                                                 overflow-y:scroll; max-height: 500px; background: ghostwhite;}"))
-                                    ),
+                                    )
                                     
                                     
-                          )
-                        )),
+                              )
+                            )
+                        ),
                
                ### PLS tab ----
                tabPanel("PLS",
                         sidebarLayout(
                           sidebarPanel(width=2,
-                                       hr(),
-                                       h3('Modeling definitions'),
-                                       hr(),
-                                       selectInput("XsForPLS","Spectra files for PLS",
-                                                   choices=character(0L), multiple = T),
-                                       selectInput("YForPLS","Variable to predict",
-                                                   choices=character(0L), multiple = F),
-                                       hr(),
-                                       sidebarLayout(
-                                         sidebarPanel(width=12,
-                                                      h4('Train control options'),
-                                                      selectInput("ResamplingForPLS", 'Resampling method',
-                                                                  choices=c('None','CV','LOO'),
-                                                                  selected='CV'),
-                                                      selectInput("NbLVForPLS", "Nb of LVs(max)",
-                                                                  choices=1:25,
-                                                                  selected=5),
-                                                      hr(),
-                                                      selectInput("AggregateForPLS","Aggregation method",
-                                                                 choices=c('Concatenate spectra'),
-                                                                 selected = 'Concatenate spectra')
-                                         ),
-                                          mainPanel(width=0)
-                                      ),
-                                      hr(),
-                                      actionButton('ComputePLS',strong("Compute model")),
-                                      shinySaveButton("FSavePLS", strong("Save model"),
-                                                      "Save PLS model to file", 
-                                                      filetype=list(RData="RData")),
-                                      h4(strong('Infos for saving PLS model')),
-                                      textAreaInput('PLSDescript', "Short description", 
-                                                    value="Description",
-                                                    width="300px", height="150px")
-                          ),
-                          
-                          
-                          mainPanel(width = 10,
-                                    column(2,
-                                           actionButton('PLSvalidationPlot', 'Plot validation'),
-                                           selectInput('NbLVPLS_Sel', 'Pick a number of LVs',
-                                                        choices=1:25,
-                                                        selected=2),
-                                           hr(),
-                                           h4('Prediction plots'),
-                                           actionButton("PlotPLSPred","Plot"),
-                                           radioButtons("PredPlotTypePLS",'',
-                                                        choices=c("train","validation"),
-                                                        selected="validation"),
-                                           selectInput("PLSPredPlotColorBy", "Color by",
-                                                       choices=c()),
-                                           selectInput("PLSPredPlotLabel", "Label with",
-                                                       choices=c()),
-                                           hr(),
-                                           actionButton('PLSBCoeffPlot',"B-coeff plot"),
-                                           hr(),
-                                           h4('Score plot'),
-                                           actionButton('PLSScorePlot','Plot'),
-                                           selectInput('PLSScorePlotFirstLV', 'LV on x-axis',
-                                                       choices=1:2),
-                                           selectInput('PLSScorePlotSecondLV', 'LV on y-axis',
-                                                        choices=1:2),
-                                           selectInput("PLSScorePlotColorBy", "Color by",
-                                                       choices=c()),
-                                           hr(),
-                                           actionButton('ShowPLSPredTable',"Show prediction table"),
-                                           bsModal("PLSPreds", "PLS predictions", "ShowPLSPredTable", size = "large",
-                                                   dataTableOutput("PlsPredTable"),
-                                                   actionButton('savePLSPreds','Save'))
-                                           
-                                    ),
-                                    column(9, offset=1,
-                                           textOutput("PLSPlotID"),
-                                           tags$head(tags$style("#PLSPlotID{
-                                                                 font-size: 20px;
-                                                                 font-style: bold;
-                                                                 }"
-                                                                           )
-                                                        ),
-                                           plotlyOutput("PLSPlots", 
-                                                                 height="600px",
-                                                                 width="auto"
-                                                        ),
-                                           verbatimTextOutput('PLSConsole',placeholder = T),
-                                           tags$head(tags$style("#PLSConsole{
-                                                color:blue;
-                                                font-size:14px; 
-                                                overflow-y:scroll; max-height: 300px; background: ghostwhite;}"))
+                                         hr(),
+                                         h3('Modeling definitions'),
+                                         hr(),
+                                         selectInput("XsForPLS","Spectra files for PLS",
+                                                     choices=character(0L), multiple = T),
+                                         selectInput("YForPLS","Variable to predict",
+                                                     choices=character(0L), multiple = F),
+                                         hr(),
+                                         sidebarLayout(
+                                           sidebarPanel(width=12,
+                                                        h4('Train control options'),
+                                                        selectInput("ResamplingForPLS", 'Resampling method',
+                                                                    choices=c('None','CV','LOO'),
+                                                                    selected='CV'),
+                                                        selectInput("NbLVForPLS", "Nb of LVs(max)",
+                                                                    choices=1:25,
+                                                                    selected=5),
+                                                        hr(),
+                                                        selectInput("AggregateForPLS","Aggregation method",
+                                                                   choices=c('Concatenate spectra'),
+                                                                   selected = 'Concatenate spectra')
                                            ),
-                                    
-                                           
-                                    )
-                          )
+                                            mainPanel(width=0)
+                                        ),
+                                        hr(),
+                                        actionButton('ComputePLS',strong("Compute model")),
+                                        shinySaveButton("FSavePLS", strong("Save model"),
+                                                        "Save PLS model to file", 
+                                                        filetype=list(RData="RData")),
+                                        h4(strong('Infos for saving PLS model')),
+                                        textAreaInput('PLSDescript', "Short description", 
+                                                      value="Description",
+                                                      width="300px", height="150px")
+                            ),
+                          
+                          
+                            mainPanel(width = 10,
+                                      column(2,
+                                               actionButton('PLSvalidationPlot', 'Plot validation'),
+                                               selectInput('NbLVPLS_Sel', 'Pick a number of LVs',
+                                                            choices=1:25,
+                                                            selected=2),
+                                               hr(),
+                                               h4('Prediction plots'),
+                                               actionButton("PlotPLSPred","Plot"),
+                                               radioButtons("PredPlotTypePLS",'',
+                                                            choices=c("train","validation"),
+                                                            selected="validation"),
+                                               selectInput("PLSPredPlotColorBy", "Color by",
+                                                           choices=c()),
+                                               selectInput("PLSPredPlotLabel", "Label with",
+                                                           choices=c()),
+                                               hr(),
+                                               actionButton('PLSBCoeffPlot',"B-coeff plot"),
+                                               hr(),
+                                               h4('Score plot'),
+                                               actionButton('PLSScorePlot','Plot'),
+                                               selectInput('PLSScorePlotFirstLV', 'LV on x-axis',
+                                                           choices=1:2),
+                                               selectInput('PLSScorePlotSecondLV', 'LV on y-axis',
+                                                            choices=1:2),
+                                               selectInput("PLSScorePlotColorBy", "Color by",
+                                                           choices=c()),
+                                               hr(),
+                                               actionButton('ShowPLSPredTable',"Show prediction table"),
+                                               bsModal("PLSPreds", "PLS predictions", "ShowPLSPredTable", size = "large",
+                                                       dataTableOutput("PlsPredTable"),
+                                                       actionButton('savePLSPreds','Save'))
+                                             
+                                      ),
+                                      column(9, offset=1,
+                                               textOutput("PLSPlotID"),
+                                               tags$head(tags$style("#PLSPlotID{
+                                                                     font-size: 20px;
+                                                                     font-style: bold;
+                                                                     }"
+                                                                               )
+                                                            ),
+                                               plotlyOutput("PLSPlots", 
+                                                                     height="600px",
+                                                                     width="auto"
+                                                            ),
+                                               verbatimTextOutput('PLSConsole',placeholder = T),
+                                               tags$head(tags$style("#PLSConsole{
+                                                    color:blue;
+                                                    font-size:14px; 
+                                                    overflow-y:scroll; max-height: 300px; background: ghostwhite;}"))
+                                               )  
+                                  )
+                            )
                         ),
                
                ### Apply models tab ----
-               tabPanel("Apply models")
-               
-               
-    )
-))
+               tabPanel("Apply models",
+                        sidebarLayout(
+                          sidebarPanel(width=2,
+                                         hr(),
+                                         h3('APPLY MODELS'),
+                                         hr(),
+                                         shinyFilesButton("FLoadModel","Load model",
+                                                          "Select a model file",
+                                                          multiple = F,
+                                                          filetype=list(RData="RData")),
+                                         hr(),
+                                         h4("Model type"),
+                                         textOutput("modelType"),
+                                         h4("Model description"),
+                                         verbatimTextOutput('modelDescOnApply',
+                                                            placeholder = T),   
+                                         hr(),
+                                         actionButton("applyModel","Apply"),
+                                         actionButton("saveModelResults","Save results")
+                                      ),
+
+
+                            mainPanel(width = 10,
+                                      column(6,
+                                                plotlyOutput("modelPlot",
+                                                                height="600px",
+                                                                width="auto"
+                                                )
+                                            ),
+                                        column(6,
+                                                 DT::dataTableOutput('modelTable',
+                                                                     height='600',
+                                                                     width='auto'
+                                                 )
+                                               )
+                                      )
+                       )  
+             )
+          )
+     )
+)
