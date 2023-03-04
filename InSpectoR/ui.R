@@ -27,7 +27,8 @@ lesLibrairies <-
       "ggplot2",
       "ggthemes",
       "pls",
-      "waiter"
+      "waiter",
+      "GGally"
   )
 
 chargeLibs(lesLibrairies)
@@ -410,22 +411,46 @@ shinyUI(fluidPage(
                                          hr(),
                                          h3('APPLY MODELS'),
                                          hr(),
-                                         shinyFilesButton("FLoadModel","Load model",
+                                         shinyFilesButton("FLoadModel",strong("Load model"),
                                                           "Select a model file",
                                                           multiple = F,
                                                           filetype=list(RData="RData")),
                                          hr(),
                                          h4("Model type"),
                                          textOutput("modelType"),
-                                         h4("Model description"),
-                                         verbatimTextOutput('modelDescOnApply',
-                                                            placeholder = T),
-                                         h4("Spectrum type requirements"),
+                                         tags$head(tags$style(HTML("
+                                                                  #modelType {
+                                                                    font-size: 18px;
+                                                                    color: blue;
+                                                                  }
+                                                                  "))),
+                                         hr(),
+                                         h4(strong("Model description")),
+                                         textOutput('modelDescOnApply'),
+                                         tags$head(tags$style(HTML("
+                                                                  #modelDescOnApply {
+                                                                    font-size: 16px;
+                                                                    color: blue;
+                                                                  }
+                                                                  "))),
+                                         hr(),
+                                         h4(strong("Spectrum type requirements")),
                                          verbatimTextOutput('dataTypeOnApply',
                                                             placeholder = T),
+                                         tags$head(tags$style(HTML("
+                                                                  #dataTypeOnApply {
+                                                                    font-size: 18px;
+                                                                    color: blue;
+                                                                  }
+                                                                  "))),
                                          hr(),
-                                         actionButton("applyModel","Apply"),
-                                         actionButton("saveModelResults","Save results")
+                                         selectInput('FirstPCApplyPCA', 'First PC',
+                                                     choices = "1"),
+                                       
+                                         selectInput('LastPCApplyPCA', 'Last PC',
+                                                     choices = "1"),
+                                         actionButton("applyModel",strong("Apply")),
+                                         actionButton("saveModelResults",strong("Save results"))
                                       ),
 
 

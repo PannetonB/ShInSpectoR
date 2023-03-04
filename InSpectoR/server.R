@@ -531,7 +531,6 @@ shinyServer(function(input, output, session) {
     
     ## Reacts to clearAllFilters button ----
     observeEvent(input$clearAllFilters, {
-      rangees <- input$Ys_rows_all
       proxy_Ys %>% clearSearch()
     })
     
@@ -1940,6 +1939,8 @@ shinyServer(function(input, output, session) {
       
       shinyjs::hide("applyModel")
       shinyjs::hide("saveModelResults")
+      shinyjs::hide("FirstPCApplyPCA")
+      shinyjs::hide("LastPCApplyPCA")
       
     })
     
@@ -1951,12 +1952,106 @@ shinyServer(function(input, output, session) {
       shinyFileChoose(input, "FLoadModel", roots=volumes, session=session)
       fileinfo <<- parseFilePaths(volumes, input$FLoadModel)
       if (nrow(fileinfo) > 0){
+        modelEnv <<- new.env()
         leFichier <- fileinfo$datapath
-        load(file=leFichier, envir = globalenv()) 
+        load(file=leFichier, envir = modelEnv) 
+        output$modelType <- renderText(modelEnv$model_descript$type)
+        output$modelDescOnApply <- renderText(modelEnv$model_descript$description)
+        shortTypeMod <- getShortType(modelEnv$model_descript$datatype)
+        shortTypeLoaded <- getShortType(ALLXDataList)
+        if (all(shortTypeMod %in% shortTypeLoaded)){  #Required data available
+          output$dataTypeOnApply <- renderText(paste0(shortTypeMod,collapse="\n"))
+          shinyjs::show("applyModel")
+          shinyjs::show("saveModelResults")
+          shinyjs::show("FirstPCApplyPCA")
+          shinyjs::show("LastPCApplyPCA")
+          updateSelectInput(session,"LastPCApplyPCA",
+                            choices=1:modelEnv$NCPs, selected=modelEnv$NCPs)
+        }else         #required data not available
+          output$dataTypeOnApply <- renderText(paste0("Required data types\n",
+                                                      "not available.\n",
+                                                      "Cannot apply this\n",
+                                                      "model!"))
+        
       }
     })
     
+    # *********************************************************************
+    
+    ## Reacts to applyModel button ----
+    observeEvent(input$applyModel,{
+     
+      switch(modelEnv$model_descript$type,
+             PCA = {
+                     #ID required spectrum types and make sur names in
+                     #modelEnv matches names of spectrum types.
+                      shortTypeMod <- getShortType(modelEnv$model_descript$datatype)
+                      shortTypeLoaded <- getShortType(ALLXDataList)
+                      lesTypes <- shortTypeLoaded %in% shortTypeMod
+                      
+                      #Modify names
+                      lesNoms <- modelEnv$PP_params$lesNoms
+                      ALLXDataList[lesTypes] <- lesNoms
+                      names(All_XData[lesTypes]) <- lesNoms
+                      
+                      #Do preprocessing
+                      Apply_PrePro(modelEnv$PP_params)
+                      
+                      #Apply model
+                      y <- NULL
+                      for (k in lesNoms){
+                        spdf<-as.data.frame(XData_p[[k]][,-1])
+                        pre <- strsplit(k,"_")[[1]][1]
+                        colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
+                        if (is.null(y)){
+                          y <- spdf
+                        }else
+                        {
+                          y <- cbind(y,spdf)
+                        }
+                      }
+                      y <- cbind(data.frame(ID=c("ID",Ys_df[[1]])),y)
+                      dat_4_PCA <- y[-1,-1]
+                      lesPreds <<- predict(modelEnv$lePCA,
+                                      newdata=dat_4_PCA)[,1:modelEnv$NCPs]
+                      i1 <- input$FirstPCApplyPCA
+                      i2 <- input$LastPCApplyPCA
+                      
+                      #Plot scores
+                     
+                      output$modelPlot <- renderPlotly({
+                        data <- modelEnv$lePCA$x[,1:modelEnv$NCPs]
+                        dats <- rbind(data,lesPreds)[,i1:i2]
+                        colorCodes <-as.factor(c(modelEnv$colorby,rep("Pred.",nrow(lesPreds))))
+                        dats <- cbind(dats,as.data.frame(colorCodes))
+                        nCl <- length(unique(modelEnv$colorby))
+                        
+                        couleurs <- c(terrain.colors(nCl),"red")
+                        p <-  ggpairs(dats, columns = i1:i2, 
+                                      ggplot2::aes(colour=colorCodes),
+                                      upper = NULL)
+                        for(i in 1:p$nrow) {
+                          for(j in 1:p$ncol){
+                            p[i,j] <- p[i,j] + 
+                              scale_fill_manual(values=couleurs) +
+                              scale_color_manual(values=couleurs)  
+                          }
+                        }
+                        
+                        ggplotly(p)
+                      })
+                   },
+             PLS = {
+               
+                   },
+             PLSDA = {
+               
+                   }
+             )
+    })
 })
+    
+
       
     
     
