@@ -1962,9 +1962,9 @@ shinyServer(function(input, output, session) {
         if (all(shortTypeMod %in% shortTypeLoaded)){  #Required data available
           output$dataTypeOnApply <- renderText(paste0(shortTypeMod,collapse="\n"))
           shinyjs::show("applyModel")
-          shinyjs::show("saveModelResults")
           shinyjs::show("FirstPCApplyPCA")
           shinyjs::show("LastPCApplyPCA")
+          shinyjs::hide("saveModelResults")
           updateSelectInput(session,"LastPCApplyPCA",
                             choices=1:modelEnv$NCPs, selected=modelEnv$NCPs)
         }else         #required data not available
@@ -2014,31 +2014,98 @@ shinyServer(function(input, output, session) {
                       dat_4_PCA <- y[-1,-1]
                       lesPreds <<- predict(modelEnv$lePCA,
                                       newdata=dat_4_PCA)[,1:modelEnv$NCPs]
-                      i1 <- input$FirstPCApplyPCA
-                      i2 <- input$LastPCApplyPCA
+                      i1 <- as.integer(input$FirstPCApplyPCA)
+                      i2 <- as.integer(input$LastPCApplyPCA)
                       
                       #Plot scores
-                     
-                      output$modelPlot <- renderPlotly({
-                        data <- modelEnv$lePCA$x[,1:modelEnv$NCPs]
-                        dats <- rbind(data,lesPreds)[,i1:i2]
-                        colorCodes <-as.factor(c(modelEnv$colorby,rep("Pred.",nrow(lesPreds))))
-                        dats <- cbind(dats,as.data.frame(colorCodes))
-                        nCl <- length(unique(modelEnv$colorby))
-                        
-                        couleurs <- c(terrain.colors(nCl),"red")
-                        p <-  ggpairs(dats, columns = i1:i2, 
-                                      ggplot2::aes(colour=colorCodes),
-                                      upper = NULL)
-                        for(i in 1:p$nrow) {
-                          for(j in 1:p$ncol){
-                            p[i,j] <- p[i,j] + 
-                              scale_fill_manual(values=couleurs) +
-                              scale_color_manual(values=couleurs)  
-                          }
+                      data <- modelEnv$lePCA$x[,1:modelEnv$NCPs]
+                      dats <- rbind(data,lesPreds)[,i1:i2]
+                      colorCodes <-as.factor(c(as.character(modelEnv$colorby),rep("Pred.",nrow(lesPreds))))
+                      dats <- cbind(dats,as.data.frame(colorCodes))
+                      nCl <- length(unique(modelEnv$colorby))
+                      
+                      couleurs <- c(mesCouleurs[1:nCl],"black")
+                      
+                      # #My own plot
+                      # #First create plots and then arrange
+                      # #PC scatter plots
+                      lesRows <- i2-i1+1
+                      lesCols <- lesRows
+                      sp <- list() #upper row - nothing yet
+                      for (i in 1:9){
+                        sp <- c(sp, list(
+                          ggplot2::ggplot() +
+                            ggplot2::theme_void() +
+                            ggplot2::geom_text(ggplot2::aes(0,0,label=' ')) +
+                            ggplot2::xlab(NULL)
+                          )
+                        )
+                      }
+                      #Set up legend
+                      kk=8
+                      df <- cbind(dats[,c(1,2)],as.data.frame(colorCodes),
+                                  row.names=NULL)
+                      nom1 <- names(df)[1]
+                      nom2 <- names(df)[2]
+                      sp[[kk]] <- ggplot2::ggplot(df, 
+                                                  ggplot2::aes(x = .data[[nom1]],
+                                                               y = .data[[nom2]], 
+                                                               color = colorCodes)) +
+                        ggplot2::geom_point() + 
+                        ggplot2::scale_color_manual(values=couleurs) +
+                        ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 6)))
+                      leg <- ggpubr::get_legend(sp[[kk]])
+                      sp[[kk]] <- ggpubr::as_ggplot(leg)
+                      
+                    
+                      # #Lower as PCs scatter
+                      for (i in (i1+1):i2){
+                        for (j in i1:(i-1)){
+                          kk <- (j-1)*lesCols+i
+                          df <- cbind(dats[,c(j,i)],as.data.frame(colorCodes),
+                                     row.names=NULL)
+                           nom1 <- names(df)[1]
+                           nom2 <- names(df)[2]
+                           sp[[kk]] <- ggplot2::ggplot(df, 
+                                                       ggplot2::aes(x = .data[[nom1]],
+                                                            y = .data[[nom2]], 
+                                                            color = colorCodes)) +
+                             ggplot2::scale_color_manual(values=couleurs) +
+                                              ggplot2::geom_point(show.legend = FALSE) 
                         }
-                        
-                        ggplotly(p)
+                      }
+                      # #Diag as densities
+                      pos <- c(1,5,9)
+                      for (i in i1:i2){
+                        df <- cbind(dats[,i],as.data.frame(colorCodes),
+                                    row.names=NULL)
+                        nom1 <- names(df)[1]
+                        sp[[(i-1)*3+i]] <-
+                          ggplot2::ggplot(df, ggplot2::aes(x=.data[[nom1]],
+                                                           fill=colorCodes)) +
+                          ggplot2::geom_density(adjust=1.5, alpha=.6, show.legend=FALSE) +
+                          ggplot2::scale_fill_manual(values=couleurs) +
+                          ggplot2::labs(x=paste0("PC",i))
+                      }
+                      
+                      #OD-SD plot on top right
+                      kk=7
+                      df <- data.frame(SD=modelEnv$dds$SDist,
+                                       OD=modelEnv$dds$ODist,
+                                       colorCodes = modelEnv$colorby)
+                      nom1 <- names(df)[1]
+                      nom2 <- names(df)[2]
+                      sp[[kk]] <- ggplot2::ggplot(df, 
+                                                  ggplot2::aes(x = .data[[nom1]],
+                                                               y = .data[[nom2]], 
+                                                               color = colorCodes)) +
+                        ggplot2::geom_point(show.legend = FALSE) +
+                        ggplot2::scale_color_manual(values=couleurs) +
+                        ggplot2::labs(x="Score distance",
+                                      y="Outside distance")
+                      
+                      output$modelPlot <- renderPlot({
+                        gridExtra::marrangeGrob(sp,ncol=3,nrow=3,top=NULL)
                       })
                    },
              PLS = {
@@ -2048,6 +2115,23 @@ shinyServer(function(input, output, session) {
                
                    }
              )
+      shinyjs::show("saveModelResults")
+    })
+    
+    # *********************************************************************
+    
+    ## Reacts to saveModelResults button ----
+    observe({
+      volumes <- c("UserFolder"=fs::path_home())
+      shinyFileSave(input, "saveModelResults", roots=volumes, session=session)
+      fileinfo <- parseSavePath(volumes, input$saveModelResults)
+      if (nrow(fileinfo) > 0) {
+        leFichier <- fileinfo$datapath
+        outDF <- cbind(Ys_df,lesPreds)
+        utils::write.table(outDF,file=leFichier,
+                           row.names=FALSE, sep="\t")
+        
+      }
     })
 })
     

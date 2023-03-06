@@ -18,7 +18,7 @@ whichPLSDAPlot <<- "none"
 
 ## In Shiny app ----
 
-mesCouleurs <- paletteer::paletteer_d("Polychrome::palette36")
+mesCouleurs <- paletteer::paletteer_d("Polychrome::palette36")[-c(1,2)]
 
 # Functions for the app ----
 
@@ -229,7 +229,8 @@ computePCAonRaw <- function(nCP, doRayleigh=FALSE)
         ind2 <- dats[1,-1] <= (EXwv+50)
         myarray <- dats[-1,c(FALSE,(ind1 & ind2))]
         #Smooth per line
-        myarray <- apply(myarray,2,function(x) smooth.spline(x)$y)
+        if (nrow(myarray)>3)
+          myarray <- apply(myarray,2,function(x) smooth.spline(x)$y)
         infl <- apply(myarray,2,function(x) c(FALSE,diff(diff(x)>0)!=0))
         #Find inflection points (1rst derivative changes sign)
         wvDips <- apply(infl,1, function(x) (EXwv:(EXwv+50))[which(x)[1]])

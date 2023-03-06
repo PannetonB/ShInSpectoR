@@ -28,7 +28,8 @@ lesLibrairies <-
       "ggthemes",
       "pls",
       "waiter",
-      "GGally"
+      "GGally",
+      "ggpubr"
   )
 
 chargeLibs(lesLibrairies)
@@ -450,13 +451,15 @@ shinyUI(fluidPage(
                                          selectInput('LastPCApplyPCA', 'Last PC',
                                                      choices = "1"),
                                          actionButton("applyModel",strong("Apply")),
-                                         actionButton("saveModelResults",strong("Save results"))
+                                         shinySaveButton("saveModelResults", strong("Save results"),
+                                                         "Define file name", 
+                                                         filetype=list(txt = "txt"))
                                       ),
 
 
                             mainPanel(width = 10,
                                       column(6,
-                                                plotlyOutput("modelPlot",
+                                                plotOutput("modelPlot",
                                                                 height="600px",
                                                                 width="auto"
                                                 )
