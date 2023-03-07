@@ -416,7 +416,7 @@ shinyServer(function(input, output, session) {
     
     ## Reacts to X selection ----
     observe({
-        XDataList <<- sort(input$Xs)
+         XDataList <<- sort(input$Xs)
         isolate(if (length(XDataList>0)){
           #Update prepro tables 
           #Truncation
@@ -737,9 +737,12 @@ shinyServer(function(input, output, session) {
       shinyFileSave(input, "FSavePrePro", roots=volumes, session=session)
       fileinfo <- parseSavePath(volumes, input$FSavePrePro)
       if (nrow(fileinfo) > 0) {
-        leFichier <- fileinfo$datapath
-        PP_params <- collectPreProParams(PPvaluesTrunc,input)
-        save(PP_params,file=leFichier)
+        isolate({
+          leFichier <- fileinfo$datapath
+          PP_params <- collectPreProParams(PPvaluesTrunc,input)
+          PP_params <- stripPreProNames(PP_params)
+          save(PP_params,file=leFichier)
+        })
       }
     })
     
@@ -774,8 +777,10 @@ shinyServer(function(input, output, session) {
           }
         }
         
+        PP_params <- buildPreProNames(PP_params)
         #Check spectrum types
-        if (!all(XDataList == PP_params$lesNoms)){   #spectrum types do not match
+        if ((length(XDataList) != length(PP_params$lesNoms)) || 
+             !all(XDataList == PP_params$lesNoms)){   #spectrum types do not match
           showModal(modalDialog(
             title = "WARNING",
             "Selected spectrum types do not match!"
@@ -786,17 +791,19 @@ shinyServer(function(input, output, session) {
           isolate(PPvaluesTrunc$dfWorking$x$data[,2:3] <- PP_params$trunc_limits[,1:2])
           
           #update per spectrum and SavGol options
-          for (k in inserted_perSpectrumOptions()){
-            for (id in PP_params$lesNoms){
-              updateRadioButtons(session, paste0(id,"_A"), selected = PP_params$perSpecParams[[id]][1]) 
-              updateNumericInput(session, paste0(id,"_B"), value = PP_params$perSpecParams[[id]][2])
-              updateNumericInput(session, paste0(id,"_C"), value = PP_params$perSpecParams[[id]][3])
-              updateCheckboxInput(session, paste0(id,"_D"), value = PP_params$savgolParams$doSavGol[[id]])
-              updateNumericInput(session, paste0(id,'_E'), value = PP_params$savgolParams$w[[id]])
-              updateNumericInput(session, paste0(id,'_F'), value = PP_params$savgolParams$p[[id]])
-              updateNumericInput(session, paste0(id,'_G'), value = PP_params$savgolParams$m[[id]])
+          isolate({
+            for (k in inserted_perSpectrumOptions()){
+              for (id in PP_params$lesNoms){
+                updateRadioButtons(session, paste0(id,"_A"), selected = PP_params$perSpecParams[[id]][1]) 
+                updateNumericInput(session, paste0(id,"_B"), value = PP_params$perSpecParams[[id]][2])
+                updateNumericInput(session, paste0(id,"_C"), value = PP_params$perSpecParams[[id]][3])
+                updateCheckboxInput(session, paste0(id,"_D"), value = PP_params$savgolParams$doSavGol[[id]])
+                updateNumericInput(session, paste0(id,'_E'), value = PP_params$savgolParams$w[[id]])
+                updateNumericInput(session, paste0(id,'_F'), value = PP_params$savgolParams$p[[id]])
+                updateNumericInput(session, paste0(id,'_G'), value = PP_params$savgolParams$m[[id]])
+              }
             }
-          }
+          })
         }
       }
     })
@@ -970,32 +977,37 @@ shinyServer(function(input, output, session) {
       shinyFileSave(input, "FSavePLS", roots=volumes, session=session)
       fileinfo <- parseSavePath(volumes, input$FSavePLS)
       if (nrow(fileinfo) > 0) {
-        leFichier <- fileinfo$datapath
-        PP_params <- collectPreProParams(PPvaluesTrunc,input)
-        
-        #Need to remove some as not all XDataList members are in XsForPLS
-        toRemove <- setdiff(PP_params$lesNoms,input$XsForPLS)
-        removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
-        PP_params$lesNoms <- as.list(input$XsForPLS)
-        i <- 0
-        lapply(toRemove, function(id){
-          i <<- i+1
-          PP_params$trunc_limits <<- PP_params$trunc_limits[-removeInd[i],]
-          PP_params$perSpecParams[[id]] <<- NULL
-          PP_params$savgolParams$doSavGol[[id]] <<- NULL
-          PP_params$savgolParams$w[[id]] <<- NULL
-          PP_params$savgolParams$p[[id]] <<- NULL
-          PP_params$savgolParams$m[[id]] <<- NULL
+        isolate({
+          leFichier <- fileinfo$datapath
+          PP_params <- collectPreProParams(PPvaluesTrunc,input)
+          
+          #Need to remove some as not all XDataList members are in XsForPLS
+          toRemove <- setdiff(PP_params$lesNoms,input$XsForPLS)
+          removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
+          PP_params$lesNoms <- as.list(sort(input$XsForPLS))
+          i <- 0
+          lapply(toRemove, function(id){
+            i <<- i+1
+            PP_params$trunc_limits <<- PP_params$trunc_limits[-removeInd[i],]
+            PP_params$perSpecParams[[id]] <<- NULL
+            PP_params$savgolParams$doSavGol[[id]] <<- NULL
+            PP_params$savgolParams$w[[id]] <<- NULL
+            PP_params$savgolParams$p[[id]] <<- NULL
+            PP_params$savgolParams$m[[id]] <<- NULL
+          })
+          nom_lesX <- sort(input$XsForPLS)
+          shortNames <- sapply(strsplit(nom_lesX,'_'),"[[",1)
+          model_descript <- list(
+            type = "PLS",
+            description = input$PLSDescript,
+            datatype = shortNames,
+            aggregation = input$AggregateForPLS
+          )
+          pls_ncomp <- as.numeric(input$NbLVPLS_Sel)
+          PP_params <- stripPreProNames(PP_params)
+          colorby <- input$PLSPredPlotColorBy
+          save(model_descript,PP_params,plsFit,pls_ncomp,colorby,file=leFichier) 
         })
-        model_descript <- list(
-          type = "PLS",
-          description = input$PLSDescript,
-          datatype = input$XsForPLS,
-          aggregation = input$AggregateForPLS
-        )
-        pls_ncomp <- as.numeric(input$NbLVPLS_Sel)
-        colorby <- input$PLSPredPlotColorBy
-        save(model_descript,PP_params,plsFit,pls_ncomp,colorby,file=leFichier) 
       }
     })
     
@@ -1356,13 +1368,15 @@ shinyServer(function(input, output, session) {
       shinyFileSave(input, "PCAScoresSave", roots=volumes, session=session)
       fileinfo <- parseSavePath(volumes, input$PCAScoresSave)
       if (nrow(fileinfo) > 0) {
-        scores<-lePCA$x[,1:input$NPCsforPCA]
-        row.names(scores)=Ys_df[,1]  #Put sample IDs as row names.
-        #Define column names
-        shortNames <- lapply(strsplit(input$XsforPCA,"_"), function(x) x[1])
-        pre <- paste(unlist(shortNames),collapse="_")
-        colonnes <- paste(pre,paste0("PC",1:input$NPCsforPCA),sep="_")
-        utils::write.table(scores,file=fileinfo$datapath,sep="\t")
+        isolate({
+          scores<-lePCA$x[,1:input$NPCsforPCA]
+          row.names(scores)=Ys_df[,1]  #Put sample IDs as row names.
+          #Define column names
+          shortNames <- lapply(strsplit(input$XsforPCA,"_"), function(x) x[1])
+          pre <- paste(unlist(shortNames),collapse="_")
+          colonnes <- paste(pre,paste0("PC",1:input$NPCsforPCA),sep="_")
+          utils::write.table(scores,file=fileinfo$datapath,sep="\t")
+        })
       }
     })
     
@@ -1375,38 +1389,41 @@ shinyServer(function(input, output, session) {
       shinyFileSave(input, "PCAModelSave", roots=volumes, session=session)
       fileinfo <- parseSavePath(volumes, input$PCAModelSave)
       if (nrow(fileinfo) > 0){
-        nom_lesX <- input$XsforPCA
-        shortNames <- sapply(strsplit(nom_lesX,'_'),"[[",1)
-        model_descript=list(type="PCA",
-                            description=input$PCADescript,
-                            datatype=shortNames)
-        colorby<-Ys_df[,input$PCAPlotColorBy]
-        #Add distances to model output
-        #pr_2_prin is for converting prcomp output to princomp output
-        pca2<-pr_2_prin(lePCA)
-        #Compute score and orthogonal distances
-        dds <- chemometrics::pcaDiagplot(dat_4_PCA,
-                                    pca2,a=as.numeric(input$NPCsforPCA),
-                                    plot=FALSE,scale=FALSE)
+        isolate({
+          nom_lesX <- sort(input$XsforPCA)
+          shortNames <- sapply(strsplit(nom_lesX,'_'),"[[",1)
+          model_descript=list(type="PCA",
+                              description=input$PCADescript,
+                              datatype=shortNames)
+          colorby<-Ys_df[,input$PCAPlotColorBy]
+          #Add distances to model output
+          #pr_2_prin is for converting prcomp output to princomp output
+          pca2<-pr_2_prin(lePCA)
+          #Compute score and orthogonal distances
+          dds <- chemometrics::pcaDiagplot(dat_4_PCA,
+                                      pca2,a=as.numeric(input$NPCsforPCA),
+                                      plot=FALSE,scale=FALSE)
+            
+          PP_params <- collectPreProParams(PPvaluesTrunc,input)
           
-        PP_params <- collectPreProParams(PPvaluesTrunc,input)
-        
-        toRemove <- setdiff(PP_params$lesNoms,input$XsforPCA)
-        removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
-        PP_params$lesNoms <- as.list(input$XsforPCA)
-        i <- 0
-        lapply(toRemove, function(id){
-          i <<- i+1
-          PP_params$trunc_limits <<- PP_params$trunc_limits[-removeInd[i],]
-          PP_params$perSpecParams[[id]] <<- NULL
-          PP_params$savgolParams$doSavGol[[id]] <<- NULL
-          PP_params$savgolParams$w[[id]] <<- NULL
-          PP_params$savgolParams$p[[id]] <<- NULL
-          PP_params$savgolParams$m[[id]] <<- NULL
+          toRemove <- setdiff(PP_params$lesNoms,input$XsforPCA)
+          removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
+          PP_params$lesNoms <- as.list(sort(input$XsforPCA))
+          i <- 0
+          lapply(toRemove, function(id){
+            i <<- i+1
+            PP_params$trunc_limits <<- PP_params$trunc_limits[-removeInd[i],]
+            PP_params$perSpecParams[[id]] <<- NULL
+            PP_params$savgolParams$doSavGol[[id]] <<- NULL
+            PP_params$savgolParams$w[[id]] <<- NULL
+            PP_params$savgolParams$p[[id]] <<- NULL
+            PP_params$savgolParams$m[[id]] <<- NULL
+          })
+          NCPs <- input$NPCsforPCA
+          PP_params <- stripPreProNames(PP_params)
+          save(model_descript,PP_params,lePCA,NCPs,dds,colorby,
+               file=fileinfo$datapath)
         })
-        NCPs <- input$NPCsforPCA
-        save(model_descript,PP_params,lePCA,NCPs,dds,colorby,
-             file=fileinfo$datapath)
       }
     })
     
@@ -1882,32 +1899,36 @@ shinyServer(function(input, output, session) {
       shinyFileSave(input, "FSavePLSDA", roots=volumes, session=session)
       fileinfo <- parseSavePath(volumes, input$FSavePLSDA)
       if (nrow(fileinfo) > 0) {
-        leFichier <- fileinfo$datapath
-        PP_params <- collectPreProParams(PPvaluesTrunc,input)
-        
-        #Need to remove some as not all XDataList members are in XsForPLS
-        toRemove <- setdiff(PP_params$lesNoms,input$XsForPLSDA)
-        removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
-        PP_params$lesNoms <- as.list(input$XsForPLSDA)
-        i <- 0
-        lapply(toRemove, function(id){
-          i <<- i+1
-          PP_params$trunc_limits <<- PP_params$trunc_limits[-removeInd[i],]
-          PP_params$perSpecParams[[id]] <<- NULL
-          PP_params$savgolParams$doSavGol[[id]] <<- NULL
-          PP_params$savgolParams$w[[id]] <<- NULL
-          PP_params$savgolParams$p[[id]] <<- NULL
-          PP_params$savgolParams$m[[id]] <<- NULL
+        isolate({
+          leFichier <- fileinfo$datapath
+          PP_params <- collectPreProParams(PPvaluesTrunc,input)
+          
+          #Need to remove some as not all XDataList members are in XsForPLS
+          toRemove <- setdiff(PP_params$lesNoms,input$XsForPLSDA)
+          removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
+          PP_params$lesNoms <- as.list(sort(input$XsForPLSDA))
+          i <- 0
+          lapply(toRemove, function(id){
+            i <<- i+1
+            PP_params$trunc_limits <<- PP_params$trunc_limits[-removeInd[i],]
+            PP_params$perSpecParams[[id]] <<- NULL
+            PP_params$savgolParams$doSavGol[[id]] <<- NULL
+            PP_params$savgolParams$w[[id]] <<- NULL
+            PP_params$savgolParams$p[[id]] <<- NULL
+            PP_params$savgolParams$m[[id]] <<- NULL
+          })
+          nom_lesX <- sort(input$XsForPLSDA)
+          shortNames <- sapply(strsplit(nom_lesX,'_'),"[[",1)
+          model_descript <- list(
+            type = "PLSDA",
+            description = input$PLSDADescript,
+            datatype = shortNames,
+            aggregation = input$AggregOpForPLSDA
+          )
+          pls_ncomp <- lapply(plsdaFit,function(x) x$bestTune$ncomp)
+          PP_params <- stripPreProNames(PP_params)
+          save(model_descript,PP_params,plsdaFit,pls_ncomp,file=leFichier)
         })
-        model_descript <- list(
-          type = "PLSDA",
-          description = input$PLSDADescript,
-          datatype = input$XsForPLSDA,
-          aggregation = input$AggregOpForPLSDA
-        )
-        pls_ncomp <- lapply(plsdaFit,function(x) x$bestTune$ncomp)
-        
-        save(model_descript,PP_params,plsFit,pls_ncomp,file=leFichier) 
       }
     })
     
@@ -1986,127 +2007,134 @@ shinyServer(function(input, output, session) {
                      #ID required spectrum types and make sur names in
                      #modelEnv matches names of spectrum types.
                       shortTypeMod <- getShortType(modelEnv$model_descript$datatype)
-                      shortTypeLoaded <- getShortType(ALLXDataList)
-                      lesTypes <- shortTypeLoaded %in% shortTypeMod
+                      shortTypeLoaded <- getShortType(sort(ALLXDataList))
+                      lesTypes <- shortTypeMod %in% shortTypeLoaded 
+                      if (!all(lesTypes)){ #not good to go!
+                        showModal(modalDialog(
+                          title = "WARNING",
+                          "Selected spectrum types do not match!"
+                        ))
+                      }else
+                      {
                       
-                      #Modify names
-                      lesNoms <- modelEnv$PP_params$lesNoms
-                      ALLXDataList[lesTypes] <- lesNoms
-                      names(All_XData[lesTypes]) <- lesNoms
-                      
-                      #Do preprocessing
-                      Apply_PrePro(modelEnv$PP_params)
-                      
-                      #Apply model
-                      y <- NULL
-                      for (k in lesNoms){
-                        spdf<-as.data.frame(XData_p[[k]][,-1])
-                        pre <- strsplit(k,"_")[[1]][1]
-                        colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
-                        if (is.null(y)){
-                          y <- spdf
-                        }else
-                        {
-                          y <- cbind(y,spdf)
+                        #Modify names
+                        modelEnv$PP_params <- buildPreProNames(modelEnv$PP_params)
+                        
+                        #Do preprocessing
+                        Apply_PrePro(modelEnv$PP_params)
+                        lesNoms <- names(XData_p)
+                        
+                        #Apply model
+                        y <- NULL
+                        for (k in lesNoms){
+                          spdf<-as.data.frame(XData_p[[k]][,-1])
+                          pre <- strsplit(k,"_")[[1]][1]
+                          colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
+                          if (is.null(y)){
+                            y <- spdf
+                          }else
+                          {
+                            y <- cbind(y,spdf)
+                          }
                         }
-                      }
-                      y <- cbind(data.frame(ID=c("ID",Ys_df[[1]])),y)
-                      dat_4_PCA <- y[-1,-1]
-                      lesPreds <<- predict(modelEnv$lePCA,
-                                      newdata=dat_4_PCA)[,1:modelEnv$NCPs]
-                      i1 <- as.integer(input$FirstPCApplyPCA)
-                      i2 <- as.integer(input$LastPCApplyPCA)
-                      
-                      #Plot scores
-                      data <- modelEnv$lePCA$x[,1:modelEnv$NCPs]
-                      dats <- rbind(data,lesPreds)[,i1:i2]
-                      colorCodes <-as.factor(c(as.character(modelEnv$colorby),rep("Pred.",nrow(lesPreds))))
-                      dats <- cbind(dats,as.data.frame(colorCodes))
-                      nCl <- length(unique(modelEnv$colorby))
-                      
-                      couleurs <- c(mesCouleurs[1:nCl],"black")
-                      
-                      # #My own plot
-                      # #First create plots and then arrange
-                      # #PC scatter plots
-                      lesRows <- i2-i1+1
-                      lesCols <- lesRows
-                      sp <- list() #upper row - nothing yet
-                      for (i in 1:9){
-                        sp <- c(sp, list(
-                          ggplot2::ggplot() +
-                            ggplot2::theme_void() +
-                            ggplot2::geom_text(ggplot2::aes(0,0,label=' ')) +
-                            ggplot2::xlab(NULL)
+                        y <- cbind(data.frame(ID=c("ID",Ys_df[[1]])),y)
+                        dat_4_PCA <- y[-1,-1]
+                        lesPreds <<- predict(modelEnv$lePCA,
+                                        newdata=dat_4_PCA)[,1:modelEnv$NCPs]
+                        i1 <- as.integer(input$FirstPCApplyPCA)
+                        i2 <- as.integer(input$LastPCApplyPCA)
+                        
+                        #Plot scores
+                        data <- modelEnv$lePCA$x[,1:modelEnv$NCPs]
+                        dats <- rbind(data,lesPreds)[,i1:i2]
+                        colorCodes <-as.factor(c(as.character(modelEnv$colorby),rep("Pred.",nrow(lesPreds))))
+                        dats <- cbind(dats,as.data.frame(colorCodes))
+                        nCl <- length(unique(modelEnv$colorby))
+                        
+                        couleurs <- c(mesCouleurs[1:nCl],"black")
+                        
+                        # #My own plot
+                        # #First create plots and then arrange
+                        # #PC scatter plots
+                        lesRows <- i2-i1+1
+                        lesCols <- lesRows
+                        sp <- list() #upper row - nothing yet
+                        for (i in 1:9){
+                          sp <- c(sp, list(
+                            ggplot2::ggplot() +
+                              ggplot2::theme_void() +
+                              ggplot2::geom_text(ggplot2::aes(0,0,label=' ')) +
+                              ggplot2::xlab(NULL)
+                            )
                           )
-                        )
-                      }
-                      #Set up legend
-                      kk=8
-                      df <- cbind(dats[,c(1,2)],as.data.frame(colorCodes),
-                                  row.names=NULL)
-                      nom1 <- names(df)[1]
-                      nom2 <- names(df)[2]
-                      sp[[kk]] <- ggplot2::ggplot(df, 
-                                                  ggplot2::aes(x = .data[[nom1]],
-                                                               y = .data[[nom2]], 
-                                                               color = colorCodes)) +
-                        ggplot2::geom_point() + 
-                        ggplot2::scale_color_manual(values=couleurs) +
-                        ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 6)))
-                      leg <- ggpubr::get_legend(sp[[kk]])
-                      sp[[kk]] <- ggpubr::as_ggplot(leg)
-                      
-                    
-                      # #Lower as PCs scatter
-                      for (i in (i1+1):i2){
-                        for (j in i1:(i-1)){
-                          kk <- (j-1)*lesCols+i
-                          df <- cbind(dats[,c(j,i)],as.data.frame(colorCodes),
-                                     row.names=NULL)
-                           nom1 <- names(df)[1]
-                           nom2 <- names(df)[2]
-                           sp[[kk]] <- ggplot2::ggplot(df, 
-                                                       ggplot2::aes(x = .data[[nom1]],
-                                                            y = .data[[nom2]], 
-                                                            color = colorCodes)) +
-                             ggplot2::scale_color_manual(values=couleurs) +
-                                              ggplot2::geom_point(show.legend = FALSE) 
                         }
-                      }
-                      # #Diag as densities
-                      pos <- c(1,5,9)
-                      for (i in i1:i2){
-                        df <- cbind(dats[,i],as.data.frame(colorCodes),
+                        #Set up legend
+                        kk=8
+                        df <- cbind(dats[,c(1,2)],as.data.frame(colorCodes),
                                     row.names=NULL)
                         nom1 <- names(df)[1]
-                        sp[[(i-1)*3+i]] <-
-                          ggplot2::ggplot(df, ggplot2::aes(x=.data[[nom1]],
-                                                           fill=colorCodes)) +
-                          ggplot2::geom_density(adjust=1.5, alpha=.6, show.legend=FALSE) +
-                          ggplot2::scale_fill_manual(values=couleurs) +
-                          ggplot2::labs(x=paste0("PC",i))
+                        nom2 <- names(df)[2]
+                        sp[[kk]] <- ggplot2::ggplot(df, 
+                                                    ggplot2::aes(x = .data[[nom1]],
+                                                                 y = .data[[nom2]], 
+                                                                 color = colorCodes)) +
+                          ggplot2::geom_point() + 
+                          ggplot2::scale_color_manual(values=couleurs) +
+                          ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 6)))
+                        leg <- ggpubr::get_legend(sp[[kk]])
+                        sp[[kk]] <- ggpubr::as_ggplot(leg)
+                        
+                      
+                        # #Lower as PCs scatter
+                        for (i in (i1+1):i2){
+                          for (j in i1:(i-1)){
+                            kk <- (j-1)*lesCols+i
+                            df <- cbind(dats[,c(j,i)],as.data.frame(colorCodes),
+                                       row.names=NULL)
+                             nom1 <- names(df)[1]
+                             nom2 <- names(df)[2]
+                             sp[[kk]] <- ggplot2::ggplot(df, 
+                                                         ggplot2::aes(x = .data[[nom1]],
+                                                              y = .data[[nom2]], 
+                                                              color = colorCodes)) +
+                               ggplot2::scale_color_manual(values=couleurs) +
+                                                ggplot2::geom_point(show.legend = FALSE) 
+                          }
+                        }
+                        # #Diag as densities
+                        pos <- c(1,5,9)
+                        for (i in i1:i2){
+                          df <- cbind(dats[,i],as.data.frame(colorCodes),
+                                      row.names=NULL)
+                          nom1 <- names(df)[1]
+                          sp[[(i-1)*3+i]] <-
+                            ggplot2::ggplot(df, ggplot2::aes(x=.data[[nom1]],
+                                                             fill=colorCodes)) +
+                            ggplot2::geom_density(adjust=1.5, alpha=.6, show.legend=FALSE) +
+                            ggplot2::scale_fill_manual(values=couleurs) +
+                            ggplot2::labs(x=paste0("PC",i))
+                        }
+                        
+                        #OD-SD plot on top right
+                        kk=7
+                        df <- data.frame(SD=modelEnv$dds$SDist,
+                                         OD=modelEnv$dds$ODist,
+                                         colorCodes = modelEnv$colorby)
+                        nom1 <- names(df)[1]
+                        nom2 <- names(df)[2]
+                        sp[[kk]] <- ggplot2::ggplot(df, 
+                                                    ggplot2::aes(x = .data[[nom1]],
+                                                                 y = .data[[nom2]], 
+                                                                 color = colorCodes)) +
+                          ggplot2::geom_point(show.legend = FALSE) +
+                          ggplot2::scale_color_manual(values=couleurs) +
+                          ggplot2::labs(x="Score distance",
+                                        y="Outside distance")
+                        
+                        output$modelPlot <- renderPlot({
+                          gridExtra::marrangeGrob(sp,ncol=3,nrow=3,top=NULL)
+                        })
                       }
-                      
-                      #OD-SD plot on top right
-                      kk=7
-                      df <- data.frame(SD=modelEnv$dds$SDist,
-                                       OD=modelEnv$dds$ODist,
-                                       colorCodes = modelEnv$colorby)
-                      nom1 <- names(df)[1]
-                      nom2 <- names(df)[2]
-                      sp[[kk]] <- ggplot2::ggplot(df, 
-                                                  ggplot2::aes(x = .data[[nom1]],
-                                                               y = .data[[nom2]], 
-                                                               color = colorCodes)) +
-                        ggplot2::geom_point(show.legend = FALSE) +
-                        ggplot2::scale_color_manual(values=couleurs) +
-                        ggplot2::labs(x="Score distance",
-                                      y="Outside distance")
-                      
-                      output$modelPlot <- renderPlot({
-                        gridExtra::marrangeGrob(sp,ncol=3,nrow=3,top=NULL)
-                      })
                    },
              PLS = {
                

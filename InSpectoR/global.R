@@ -42,6 +42,43 @@ getShortType <- function(lestypes)
 }
 
 
+
+#***********************************************************************
+
+stripPreProNames <- function(PP_params){
+  #Strip list item names so that only spectrum type ID is retained.
+  #e.g. EX320_bbla_I.txt becomes EX320.
+  shortNames <- sapply(strsplit(unlist(PP_params$lesNoms),"_"),"[[",1)
+  PP_out <- PP_params
+  PP_out$lesNoms <- shortNames
+  names(PP_out$perSpecParams) <- shortNames
+  names(PP_out$savgolParams$doSavGol) <- shortNames
+  names(PP_out$savgolParams$w) <- shortNames
+  names(PP_out$savgolParams$m) <- shortNames
+  names(PP_out$savgolParams$p) <- shortNames
+  rownames(PP_out$trunc_limits) <- shortNames
+  return(PP_out)
+} 
+#***********************************************************************
+
+buildPreProNames <- function(PP_params){
+  #Apply spectrum data file names to rename list items
+  #for PrePros when loading from file.
+  sortedALLXDataList <- sort(ALLXDataList)
+  longNames <- sortedALLXDataList
+  shortNames <- sapply(strsplit(sortedALLXDataList,"_"),"[[",1)
+  longNames <- sortedALLXDataList[shortNames %in% PP_params$lesNoms]
+  PP_out <- PP_params
+  PP_out$lesNoms <- longNames
+  names(PP_out$perSpecParams) <- longNames
+  names(PP_out$savgolParams$doSavGol) <- longNames
+  names(PP_out$savgolParams$w) <- longNames
+  names(PP_out$savgolParams$m) <- longNames
+  names(PP_out$savgolParams$p) <- longNames
+  rownames(PP_out$trunc_limits) <- longNames
+  return(PP_out)
+}
+
 #***********************************************************************
 
 collectPreProParams <- function(PPValuesTrunc,input){
