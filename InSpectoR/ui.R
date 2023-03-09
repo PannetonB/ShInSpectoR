@@ -29,7 +29,10 @@ lesLibrairies <-
       "pls",
       "waiter",
       "GGally",
-      "ggpubr"
+      "ggpubr",
+      "prospectr",
+      "caret",
+      "paletteer"
   )
 
 chargeLibs(lesLibrairies)

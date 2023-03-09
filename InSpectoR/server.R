@@ -1250,6 +1250,7 @@ shinyServer(function(input, output, session) {
       ptColor <- as.formula(paste0("~",input$PCAPlotColorBy))
       dfsPCA <- as.data.frame(lePCA$x)
       dfsPCA <- cbind(dfsPCA,Ys_df[input$PCAPlotColorBy])
+      nColor <- length(unique(dfsPCA[[input$PCAPlotColorBy]]))
      
       
       switch(input$PCATopPlotType,
@@ -1259,7 +1260,7 @@ shinyServer(function(input, output, session) {
                                x=lepc1, y=lepc2,
                                type = "scatter", mode = "markers",
                                color=ptColor,
-                               colors = mycolors,
+                               colors = mycolors[1:nColor],
                                size=8,
                                text=as.character(Ys_df[[1]]),
                                hovertemplate = paste('EchID: %{text}'),
@@ -1318,7 +1319,7 @@ shinyServer(function(input, output, session) {
                              y=as.formula(" ~ Outside"),
                              type = "scatter", mode = "markers",
                              color=ptColor,
-                             colors = mycolors,
+                             colors = mycolors[1:nColor],
                              size=8,
                              text=as.character(Ys_df[[1]]),
                              hovertemplate = paste('EchID: %{text}'),
