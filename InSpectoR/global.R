@@ -18,7 +18,8 @@ whichPLSDAPlot <<- "none"
 
 ## In Shiny app ----
 
-mesCouleurs <- paletteer::paletteer_d("Polychrome::palette36")[-c(1,2)]
+mesCouleurs <- paletteer::paletteer_d("Polychrome::palette36")[c(3,5,6,7,10,13,16,30,36)]
+mesCouleurs <- paletteer::paletteer_d("ggthemes::Classic_10")
 
 # Functions for the app ----
 
@@ -91,7 +92,7 @@ collectPreProParams <- function(PPValuesTrunc,input){
   #Truncation limits
   trunc_limits <- TruncParams[,-1]
   lesNoms <- as.list(TruncParams[,1])
-  names(trunc_limits) <- c("lo","hi")
+  names(trunc_limits) <- c("LowerLimit","HigherLimit","RayleighCutoff")
   
   #Retrieve per spectrum norm parameters 
   perSpecParams <- lapply(as.list(inserted_perSpectrumOptions()), function(opt){

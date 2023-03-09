@@ -457,16 +457,17 @@ shinyUI(fluidPage(
                                       ),
 
 
-                            mainPanel(width = 10,
+                            mainPanel(width = 10, 
+
                                       column(6,
                                                 plotOutput("modelPlot",
-                                                                height="600px",
+                                                                height="800px",
                                                                 width="auto"
                                                 )
                                             ),
                                         column(6,
                                                  DT::dataTableOutput('modelTable',
-                                                                     height='600',
+                                                                     height='800',
                                                                      width='auto'
                                                  )
                                                )

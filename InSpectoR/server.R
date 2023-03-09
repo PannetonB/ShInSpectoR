@@ -640,8 +640,8 @@ shinyServer(function(input, output, session) {
                      dfsPCA <- as.data.frame(PCAsDT[[lePCA]]$x)
                      xall <- isolate(as.numeric(dfsPCA[input$pc1][,1]))
                      yall <-isolate( as.numeric(dfsPCA[input$pc2][,1]))
-                     sels <<- as.data.frame(cbind(d$x,d$y))
-                     refs <<- as.data.frame(cbind(xall,yall))
+                     sels <- as.data.frame(cbind(d$x,d$y))
+                     refs <- as.data.frame(cbind(xall,yall))
                      lesRows <- prodlim::row.match(sels,refs)
                      proxy_Ys %>% selectRows(lesRows)
                  },
@@ -752,7 +752,7 @@ shinyServer(function(input, output, session) {
     observe({
       volumes <- c("UserFolder"=fs::path_home())
       shinyFileChoose(input, "FLoadPrePro", roots=volumes, session=session)
-      fileinfo <<- parseFilePaths(volumes, input$FLoadPrePro)
+      fileinfo <- parseFilePaths(volumes, input$FLoadPrePro)
       if (nrow(fileinfo) > 0){
         leFichier <- fileinfo$datapath
         dum <- load(file=leFichier)   #in dum (character vector ), PP_params is the name of the list for ShInSpectoR
@@ -923,7 +923,7 @@ shinyServer(function(input, output, session) {
       nbLV <- as.numeric(input$NbLVForPLS)
       aggr <- input$AggregateForPLS
       Y <- Ys_df[[YName]]
-      XNames <- as.list(input$XsForPLS)
+      XNames <- as.list(sort(input$XsForPLS))
       valid <- input$ResamplingForPLS
       
       if (aggr=="Concatenate spectra"){
@@ -982,13 +982,11 @@ shinyServer(function(input, output, session) {
           PP_params <- collectPreProParams(PPvaluesTrunc,input)
           
           #Need to remove some as not all XDataList members are in XsForPLS
-          toRemove <- setdiff(PP_params$lesNoms,input$XsForPLS)
+          toRemove <- setdiff(PP_params$lesNoms,sort(input$XsForPLS))
           removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
           PP_params$lesNoms <- as.list(sort(input$XsForPLS))
-          i <- 0
+          PP_params$trunc_limits <- PP_params$trunc_limits[-removeInd,]
           lapply(toRemove, function(id){
-            i <<- i+1
-            PP_params$trunc_limits <<- PP_params$trunc_limits[-removeInd[i],]
             PP_params$perSpecParams[[id]] <<- NULL
             PP_params$savgolParams$doSavGol[[id]] <<- NULL
             PP_params$savgolParams$w[[id]] <<- NULL
@@ -1298,7 +1296,7 @@ shinyServer(function(input, output, session) {
                df <- data.frame(PC=1:lePCA_NCPs,
                                 VarExp=PCA_var_explained[1:lePCA_NCPs])
                ggplotly(
-                 ggplot2::ggplot(data=df, aes(x=PC, y=VarExp)) +
+                 ggplot2::ggplot(data=df, ggplot2::aes(x=PC, y=VarExp)) +
                    ggplot2::geom_line(color="blue")+
                    ggplot2::ylab("Fraction of variance explained")+
                    ggplot2::xlab("Principal component")
@@ -1372,7 +1370,7 @@ shinyServer(function(input, output, session) {
           scores<-lePCA$x[,1:input$NPCsforPCA]
           row.names(scores)=Ys_df[,1]  #Put sample IDs as row names.
           #Define column names
-          shortNames <- lapply(strsplit(input$XsforPCA,"_"), function(x) x[1])
+          shortNames <- lapply(strsplit(sort(input$XsforPCA),"_"), function(x) x[1])
           pre <- paste(unlist(shortNames),collapse="_")
           colonnes <- paste(pre,paste0("PC",1:input$NPCsforPCA),sep="_")
           utils::write.table(scores,file=fileinfo$datapath,sep="\t")
@@ -1406,19 +1404,19 @@ shinyServer(function(input, output, session) {
             
           PP_params <- collectPreProParams(PPvaluesTrunc,input)
           
-          toRemove <- setdiff(PP_params$lesNoms,input$XsforPCA)
-          removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
-          PP_params$lesNoms <- as.list(sort(input$XsforPCA))
-          i <- 0
-          lapply(toRemove, function(id){
-            i <<- i+1
-            PP_params$trunc_limits <<- PP_params$trunc_limits[-removeInd[i],]
-            PP_params$perSpecParams[[id]] <<- NULL
-            PP_params$savgolParams$doSavGol[[id]] <<- NULL
-            PP_params$savgolParams$w[[id]] <<- NULL
-            PP_params$savgolParams$p[[id]] <<- NULL
-            PP_params$savgolParams$m[[id]] <<- NULL
-          })
+          toRemove <- setdiff(PP_params$lesNoms,sort(input$XsforPCA))
+          if (length(toRemove)>0){
+            removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
+            PP_params$lesNoms <- as.list(sort(input$XsforPCA))
+            PP_params$trunc_limits <- PP_params$trunc_limits[-removeInd,]
+            lapply(toRemove, function(id){
+              PP_params$perSpecParams[[id]] <<- NULL
+              PP_params$savgolParams$doSavGol[[id]] <<- NULL
+              PP_params$savgolParams$w[[id]] <<- NULL
+              PP_params$savgolParams$p[[id]] <<- NULL
+              PP_params$savgolParams$m[[id]] <<- NULL
+            })
+          }
           NCPs <- input$NPCsforPCA
           PP_params <- stripPreProNames(PP_params)
           save(model_descript,PP_params,lePCA,NCPs,dds,colorby,
@@ -1496,7 +1494,7 @@ shinyServer(function(input, output, session) {
                                                    p=laprop, list=FALSE)
       
       Ys <- data.frame(Cl1=Ys_df[,input$YForPLSDA])
-      Xs <- input$XsForPLSDA
+      Xs <- sort(input$XsForPLSDA)
       
       if (input$AggregOpForPLSDA=="concatenate"){
         #ATTN : do not work with XData_p but with the selected items.
@@ -1586,27 +1584,27 @@ shinyServer(function(input, output, session) {
       #Generate output to GUI console.
       lesnoms<-Xs
       dumind<-as.list(1:length(plsdaFit)) 
-      plsda_txt_output<<-lapply(dumind,function(x) utils::capture.output(print(plsdaFit[[x]])))
+      plsda_txt_output<-lapply(dumind,function(x) utils::capture.output(print(plsdaFit[[x]])))
       if (input$AggregOpForPLSDA=="concatenate")
         lesnoms=as.list(paste(lesnoms,collapse=" + "))
-      for (k in 1:length(plsdaFit)) plsda_txt_output[[k]][1]<<-paste("\n******************\nPLSDA on ",
+      for (k in 1:length(plsdaFit)) plsda_txt_output[[k]][1] <- paste("\n******************\nPLSDA on ",
                                                                      lesnoms[[k]], sep = "")
       if (N_modeles>1){
         FUNC<-input$AggregOpForPLSDA 
-        plsda_txt_output <<- c(plsda_txt_output,
+        plsda_txt_output <- c(plsda_txt_output,
                                paste("*******\nConfusion matrix on training data for models aggregated with ",FUNC,
                                      ".\n",sep=""),
                                utils::capture.output(print(val_confusionmat)))
-        plsda_txt_output <<- c(plsda_txt_output,
+        plsda_txt_output <- c(plsda_txt_output,
                                paste("*******\nConfusion matrix on test data for models aggregated with ",FUNC,
                                      ".\n",sep=""),
                                utils::capture.output(print(test_confusionmat)))
       }else
-      {  plsda_txt_output <<- c(plsda_txt_output,
+      {  plsda_txt_output <- c(plsda_txt_output,
                                 paste("*******\nConfusion matrix on training data for model on ",lesnoms[[1]],
                                       ".\n",sep=""),
                                 utils::capture.output(print(val_confusionmat)))
-      plsda_txt_output <<- c(plsda_txt_output,
+      plsda_txt_output <- c(plsda_txt_output,
                              paste("*******\nConfusion matrix on test data for model on ",lesnoms[[1]],
                                    ".\n",sep=""),
                              utils::capture.output(print(test_confusionmat)))
@@ -1618,7 +1616,7 @@ shinyServer(function(input, output, session) {
       })
       
       #Plot
-      nom_lesX <- input$XsForPLSDA
+      nom_lesX <- sort(input$XsForPLSDA)
       accs <- lapply(plsdaFit,function(p) p$results$Accuracy)
       accsSD <- lapply(plsdaFit,function(p) p$results$AccuracySD)
       N <- length(accs[[1]])
@@ -1700,7 +1698,7 @@ shinyServer(function(input, output, session) {
       input$PLSDAvalidationPlot
       if (whichPLSDAPlot=="Validation"){
         isolate({
-          nom_lesX <- input$XsForPLSDA
+          nom_lesX <- sort(input$XsForPLSDA)
           accs <- lapply(plsdaFit,function(p) p$results$Accuracy)
           accsSD <- lapply(plsdaFit,function(p) p$results$AccuracySD)
           N <- length(accs[[1]])
@@ -1810,7 +1808,7 @@ shinyServer(function(input, output, session) {
           }else
           {
             coeffs <- lapply(plsdaFit, function(x) coef(x$finalModel))
-            nom_lesX <- as.list(input$XsForPLSDA)
+            nom_lesX <- as.list(sort(input$XsForPLSDA))
             lesNoms <- sapply(strsplit(unlist(nom_lesX),'_'),"[[",1)
             wl <- lapply(as.list(nom_lesX), function(ii) as.numeric(XData_p[[ii]][1,-1]))
             plotframe<-cbind(as.data.frame(coeffs[[1]][,,1]),
@@ -1904,13 +1902,11 @@ shinyServer(function(input, output, session) {
           PP_params <- collectPreProParams(PPvaluesTrunc,input)
           
           #Need to remove some as not all XDataList members are in XsForPLS
-          toRemove <- setdiff(PP_params$lesNoms,input$XsForPLSDA)
+          toRemove <- setdiff(PP_params$lesNoms,sort(input$XsForPLSDA))
           removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
           PP_params$lesNoms <- as.list(sort(input$XsForPLSDA))
-          i <- 0
+          PP_params$trunc_limits <- PP_params$trunc_limits[-removeInd,]
           lapply(toRemove, function(id){
-            i <<- i+1
-            PP_params$trunc_limits <<- PP_params$trunc_limits[-removeInd[i],]
             PP_params$perSpecParams[[id]] <<- NULL
             PP_params$savgolParams$doSavGol[[id]] <<- NULL
             PP_params$savgolParams$w[[id]] <<- NULL
@@ -1962,6 +1958,8 @@ shinyServer(function(input, output, session) {
       shinyjs::hide("saveModelResults")
       shinyjs::hide("FirstPCApplyPCA")
       shinyjs::hide("LastPCApplyPCA")
+      shinyjs::hide("modelPlot")
+      shinyjs::hide('modelTable')
       
     })
     
@@ -1971,7 +1969,7 @@ shinyServer(function(input, output, session) {
     observe({
       volumes <- c("UserFolder"=fs::path_home())
       shinyFileChoose(input, "FLoadModel", roots=volumes, session=session)
-      fileinfo <<- parseFilePaths(volumes, input$FLoadModel)
+      fileinfo <- parseFilePaths(volumes, input$FLoadModel)
       if (nrow(fileinfo) > 0){
         modelEnv <<- new.env()
         leFichier <- fileinfo$datapath
@@ -2038,20 +2036,23 @@ shinyServer(function(input, output, session) {
                           }
                         }
                         y <- cbind(data.frame(ID=c("ID",Ys_df[[1]])),y)
-                        dat_4_PCA <- y[-1,-1]
+                        data_4_PCA <- y[-1,-1]
                         lesPreds <<- predict(modelEnv$lePCA,
-                                        newdata=dat_4_PCA)[,1:modelEnv$NCPs]
+                                        newdata=data_4_PCA)[,1:modelEnv$NCPs]
                         i1 <- as.integer(input$FirstPCApplyPCA)
                         i2 <- as.integer(input$LastPCApplyPCA)
                         
                         #Plot scores
+                        shinyjs::show("modelPlot")
                         data <- modelEnv$lePCA$x[,1:modelEnv$NCPs]
                         dats <- rbind(data,lesPreds)[,i1:i2]
-                        colorCodes <-as.factor(c(as.character(modelEnv$colorby),rep("Pred.",nrow(lesPreds))))
+                        colorCodes <-factor(c(as.character(modelEnv$colorby),rep("Pred.",nrow(lesPreds))),
+                                               levels <- c(as.character(unique(modelEnv$colorby)),
+                                                           "Pred."))
                         dats <- cbind(dats,as.data.frame(colorCodes))
                         nCl <- length(unique(modelEnv$colorby))
                         
-                        couleurs <- c(mesCouleurs[1:nCl],"black")
+                        couleurs <- c(mesCouleurs[1:nCl],"#000000FF")
                         
                         # #My own plot
                         # #First create plots and then arrange
@@ -2098,7 +2099,9 @@ shinyServer(function(input, output, session) {
                                                               y = .data[[nom2]], 
                                                               color = colorCodes)) +
                                ggplot2::scale_color_manual(values=couleurs) +
-                                                ggplot2::geom_point(show.legend = FALSE) 
+                                                ggplot2::geom_point(show.legend = FALSE) + 
+                               theme(axis.text = element_text(size = 14)) + 
+                               theme(axis.title = element_text(size = 18))
                           }
                         }
                         # #Diag as densities
@@ -2112,14 +2115,33 @@ shinyServer(function(input, output, session) {
                                                              fill=colorCodes)) +
                             ggplot2::geom_density(adjust=1.5, alpha=.6, show.legend=FALSE) +
                             ggplot2::scale_fill_manual(values=couleurs) +
-                            ggplot2::labs(x=paste0("PC",i))
+                            ggplot2::labs(x=paste0("PC",i))+ 
+                            theme(axis.text = element_text(size = 14)) + 
+                            theme(axis.title = element_text(size = 18))
                         }
                         
                         #OD-SD plot on top right
                         kk=7
-                        df <- data.frame(SD=modelEnv$dds$SDist,
-                                         OD=modelEnv$dds$ODist,
-                                         colorCodes = modelEnv$colorby)
+                        #ODist vs SDist 
+                        #Calcul OD et SD pour l'échantillon
+                        #Voir manuel de PLS Toolbox de EigenVector dans Doc du projet
+                        scs <- lesPreds
+                        eigVals <- modelEnv$lePCA$sdev[1:modelEnv$NCPs] 
+                        midMat <- diag(1/eigVals^2)
+                        SD <- sqrt(diag(scs %*% midMat %*% t(scs)))
+                        
+                        x <- as.matrix(data_4_PCA-matrix(modelEnv$lePCA$center,
+                                                         nrow=nrow(data_4_PCA),
+                                                         ncol=ncol(data_4_PCA),
+                                                         byrow = T))
+                        lds <- modelEnv$lePCA$rotation[,1:modelEnv$NCPs]
+                        midMat <- diag(nrow=dim(x)[2]) - lds %*% t(lds)
+                        OD <- sqrt(diag(x %*% midMat %*% t(x)))
+                        
+                        
+                        df <- data.frame(SD=c(modelEnv$dds$SDist, SD),
+                                         OD=c(modelEnv$dds$ODist, OD),
+                                         colorCodes = colorCodes)
                         nom1 <- names(df)[1]
                         nom2 <- names(df)[2]
                         sp[[kk]] <- ggplot2::ggplot(df, 
@@ -2129,7 +2151,9 @@ shinyServer(function(input, output, session) {
                           ggplot2::geom_point(show.legend = FALSE) +
                           ggplot2::scale_color_manual(values=couleurs) +
                           ggplot2::labs(x="Score distance",
-                                        y="Outside distance")
+                                        y="Outside distance")+ 
+                          theme(axis.text = element_text(size = 14)) + 
+                          theme(axis.title = element_text(size = 18))
                         
                         output$modelPlot <- renderPlot({
                           gridExtra::marrangeGrob(sp,ncol=3,nrow=3,top=NULL)
