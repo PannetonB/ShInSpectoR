@@ -106,8 +106,9 @@ shinyServer(function(input, output, session) {
             mycolors <- colorRampPalette(mesCouleurs)(length(mesCouleurs))
             s <- sort(s)
             dfs_plotly <- dfForPlotly(XDataList,XData_p,s)
+            nColor <- length(unique(dfs_plotly[["ID"]]))
             p <- plotly::plot_ly(dfs_plotly,x=~X,y=~Spectra,
-                                 color = ~ID, colors = mycolors,
+                                 color = ~ID, colors = mycolors[1:nColor],
                                  type = 'scatter', mode = 'lines',
                                  linetype = ~DType, 
                                  name=~names) %>%
@@ -139,6 +140,7 @@ shinyServer(function(input, output, session) {
         ptColor <- as.formula(paste0("~",input$pcaPtColorBy))
         dfsPCA <- as.data.frame(PCAsDT[[lePCA]]$x)
         dfsPCA <- cbind(dfsPCA,Ys_df[input$pcaPtColorBy])
+        nColor <- length(unique(dfsPCA[[input$pcaPtColorBy]]))
         
         ### Something was selected ----
         if (length(s)) {
@@ -154,7 +156,7 @@ shinyServer(function(input, output, session) {
                             x=lepc1, y=lepc2,
                             type = "scatter", mode = "markers",
                             color=ptColor,
-                            colors = mycolors,
+                            colors = mycolors[1:nColor],
                             size=8,
                             text=as.character(Ys_df[[1]]),
                             hovertext=as.character(Ys_df[,input$pcaPtColorBy]),
@@ -201,7 +203,7 @@ shinyServer(function(input, output, session) {
                         x=lepc1, y=lepc2,
                         type = "scatter", mode = "markers",
                         color=ptColor,
-                        colors = mycolors,
+                        colors = mycolors[1:nColor],
                         size=8,
                         text=as.character(Ys_df[[1]]),
                         hovertext=as.character(Ys_df[,input$pcaPtColorBy]),
@@ -2016,10 +2018,10 @@ shinyServer(function(input, output, session) {
                       {
                       
                         #Modify names
-                        modelEnv$PP_params <- buildPreProNames(modelEnv$PP_params)
+                        locPP_params <- buildPreProNames(modelEnv$PP_params)
                         
                         #Do preprocessing
-                        Apply_PrePro(modelEnv$PP_params)
+                        Apply_PrePro(locPP_params)
                         lesNoms <- names(XData_p)
                         
                         #Apply model
@@ -2041,6 +2043,7 @@ shinyServer(function(input, output, session) {
                                         newdata=data_4_PCA)[,1:modelEnv$NCPs]
                         i1 <- as.integer(input$FirstPCApplyPCA)
                         i2 <- as.integer(input$LastPCApplyPCA)
+                        N <- i2-i1+1
                         
                         #Plot scores
                         shinyjs::show("modelPlot")
@@ -2057,10 +2060,9 @@ shinyServer(function(input, output, session) {
                         # #My own plot
                         # #First create plots and then arrange
                         # #PC scatter plots
-                        lesRows <- i2-i1+1
-                        lesCols <- lesRows
+                        
                         sp <- list() #upper row - nothing yet
-                        for (i in 1:9){
+                        for (i in 1:N^2){
                           sp <- c(sp, list(
                             ggplot2::ggplot() +
                               ggplot2::theme_void() +
@@ -2070,26 +2072,30 @@ shinyServer(function(input, output, session) {
                           )
                         }
                         #Set up legend
-                        kk=8
-                        df <- cbind(dats[,c(1,2)],as.data.frame(colorCodes),
-                                    row.names=NULL)
-                        nom1 <- names(df)[1]
-                        nom2 <- names(df)[2]
-                        sp[[kk]] <- ggplot2::ggplot(df, 
-                                                    ggplot2::aes(x = .data[[nom1]],
-                                                                 y = .data[[nom2]], 
-                                                                 color = colorCodes)) +
-                          ggplot2::geom_point() + 
-                          ggplot2::scale_color_manual(values=couleurs) +
-                          ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 6)))
-                        leg <- ggpubr::get_legend(sp[[kk]])
-                        sp[[kk]] <- ggpubr::as_ggplot(leg)
+                        if (N>2){
+                          kk=N^2-1
+                          df <- cbind(dats[,c(1,2)],as.data.frame(colorCodes),
+                                      row.names=NULL)
+                          nom1 <- names(df)[1]
+                          nom2 <- names(df)[2]
+                          sp[[kk]] <- ggplot2::ggplot(df, 
+                                                      ggplot2::aes(x = .data[[nom1]],
+                                                                   y = .data[[nom2]], 
+                                                                   color = colorCodes)) +
+                            ggplot2::geom_point() + 
+                            ggplot2::scale_color_manual(values=couleurs) +
+                            ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 6))) +
+                            theme(legend.title=element_text(size=20),
+                                  legend.text=element_text(size=14))
+                          leg <- ggpubr::get_legend(sp[[kk]])
+                          sp[[kk]] <- ggpubr::as_ggplot(leg)
+                        }
                         
                       
                         # #Lower as PCs scatter
                         for (i in (i1+1):i2){
                           for (j in i1:(i-1)){
-                            kk <- (j-1)*lesCols+i
+                            kk <- (j-1)*N+i
                             df <- cbind(dats[,c(j,i)],as.data.frame(colorCodes),
                                        row.names=NULL)
                              nom1 <- names(df)[1]
@@ -2110,7 +2116,7 @@ shinyServer(function(input, output, session) {
                           df <- cbind(dats[,i],as.data.frame(colorCodes),
                                       row.names=NULL)
                           nom1 <- names(df)[1]
-                          sp[[(i-1)*3+i]] <-
+                          sp[[(i-1)*N+i]] <-
                             ggplot2::ggplot(df, ggplot2::aes(x=.data[[nom1]],
                                                              fill=colorCodes)) +
                             ggplot2::geom_density(adjust=1.5, alpha=.6, show.legend=FALSE) +
@@ -2121,7 +2127,7 @@ shinyServer(function(input, output, session) {
                         }
                         
                         #OD-SD plot on top right
-                        kk=7
+                        kk=N*(N-1)+1
                         #ODist vs SDist 
                         #Calcul OD et SD pour l'échantillon
                         #Voir manuel de PLS Toolbox de EigenVector dans Doc du projet
@@ -2147,16 +2153,25 @@ shinyServer(function(input, output, session) {
                         sp[[kk]] <- ggplot2::ggplot(df, 
                                                     ggplot2::aes(x = .data[[nom1]],
                                                                  y = .data[[nom2]], 
-                                                                 color = colorCodes)) +
-                          ggplot2::geom_point(show.legend = FALSE) +
+                                                                 color = colorCodes)) 
+                        if (N==2){
+                          sp[[kk]] <- sp[[kk]] +  ggplot2::geom_point(show.legend = TRUE) +
+                            theme(legend.title=element_text(size=20),
+                                  legend.text=element_text(size=14))
+                        }else
+                        {
+                          sp[[kk]] <- sp[[kk]] +  ggplot2::geom_point(show.legend = FALSE)
+                        }
+                        sp[[kk]] <- sp[[kk]] +
                           ggplot2::scale_color_manual(values=couleurs) +
                           ggplot2::labs(x="Score distance",
                                         y="Outside distance")+ 
                           theme(axis.text = element_text(size = 14)) + 
                           theme(axis.title = element_text(size = 18))
                         
+                        
                         output$modelPlot <- renderPlot({
-                          gridExtra::marrangeGrob(sp,ncol=3,nrow=3,top=NULL)
+                          gridExtra::marrangeGrob(sp,ncol=N,nrow=N,top=NULL)
                         })
                       }
                    },
