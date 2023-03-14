@@ -365,7 +365,7 @@ Predict_plsda <- function(aggregOp,plsdaFit,mydata=NULL,probs=TRUE)
                              , type="prob")
     }else
     {
-      val_pred_cl <- predict(plsdaFit[[1]],newdata=mydata[[1]][,-1], type="prob")
+      val_pred_cl <- predict(plsdaFit[[1]],newdata=mydata[[1]], type="prob")
     }
     classes<-colnames(val_pred_cl)
     if (!probs)

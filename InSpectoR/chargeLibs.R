@@ -19,7 +19,8 @@ lesLibrairies <-
       "ggpubr",
       "prospectr",
       "caret",
-      "paletteer"
+      "paletteer",
+      "here"
   )
 
 cat("Loading libraires!")

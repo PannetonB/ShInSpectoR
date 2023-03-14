@@ -3,6 +3,48 @@
 
 
 
+lesLibrairies <-
+  c(  "shiny",
+      "shinyjs",
+      "shinyBS",
+      "shinyFiles",
+      "DT",
+      "plotly",
+      "dplyr",
+      "shinyjqui",
+      "rhandsontable",
+      "reactlog",
+      "ggplot2",
+      "ggthemes",
+      "pls",
+      "waiter",
+      "GGally",
+      "ggpubr",
+      "prospectr",
+      "caret",
+      "paletteer",
+      "here"
+  )
+
+cat("Loading libraires!")
+
+lapply(lesLibrairies, require, character.only = TRUE)
+
+
+
+#SET UP PROJECT PATH
+leFichier <- here("InSpectoR","www","defPath.RData")
+if (file.exists(leFichier)){
+  load(leFichier)
+  projectDir <<- utils::choose.dir(projectDir)
+  save(projectDir,file=leFichier)
+}else
+{
+  projectDir <<- utils::choose.dir(fs::path_home_r())
+  save(projectDir,file=leFichier)
+}
+
+
 shinyServer(function(input, output, session) {
  
 
@@ -1977,6 +2019,7 @@ shinyServer(function(input, output, session) {
       shinyjs::hide("LastPCApplyPCA")
       shinyjs::hide("modelPlot")
       shinyjs::hide('modelTable')
+      shinyjs::hide('factorsToShow')
       
     })
     
@@ -1998,13 +2041,24 @@ shinyServer(function(input, output, session) {
         if (all(shortTypeMod %in% shortTypeLoaded)){  #Required data available
           output$dataTypeOnApply <- renderText(paste0(shortTypeMod,collapse="\n"))
           shinyjs::show("applyModel")
-          shinyjs::show("FirstPCApplyPCA")
-          shinyjs::show("LastPCApplyPCA")
           shinyjs::hide("saveModelResults")
-          updateSelectInput(session,"FirstPCApplyPCA",
+          if (modelEnv$model_descript$type == "PCA"){
+            shinyjs::show("FirstPCApplyPCA")
+            shinyjs::show("LastPCApplyPCA")
+            shinyjs::hide("factorsToShow")
+            updateSelectInput(session,"FirstPCApplyPCA",
                             choices=1:(as.numeric(modelEnv$NCPs)-1), selected=1)
-          updateSelectInput(session,"LastPCApplyPCA",
+            updateSelectInput(session,"LastPCApplyPCA",
                             choices=2:modelEnv$NCPs, selected=2)
+          }else
+          {
+            shinyjs::hide("FirstPCApplyPCA")
+            shinyjs::hide("LastPCApplyPCA")
+            shinyjs::show("factorsToShow")
+            updateSelectInput(session,"factorsToShow",
+                              choice = names(Filter(is.factor,Ys_df)),
+                              selected=names(Filter(is.factor,Ys_df))[1])
+          }
         }else         #required data not available
           output$dataTypeOnApply <- renderText(paste0("Required data types\n",
                                                       "not available.\n",
@@ -2012,6 +2066,8 @@ shinyServer(function(input, output, session) {
                                                       "model!"))
         
       }
+      shinyjs::hide("modelTable")
+      shinyjs::hide("modelPlot")
     })
     
     # *********************************************************************
@@ -2196,8 +2252,93 @@ shinyServer(function(input, output, session) {
                
                    },
              PLSDA = {
+                       #ID required spectrum types and make sur names in
+                       #modelEnv matches names of spectrum types.
+                       shortTypeMod <- getShortType(modelEnv$model_descript$datatype)
+                       shortTypeLoaded <- getShortType(sort(ALLXDataList))
+                       lesTypes <- shortTypeMod %in% shortTypeLoaded 
+                       if (!all(lesTypes)){ #not good to go!
+                         showModal(modalDialog(
+                           title = "WARNING",
+                           "Selected spectrum types do not match!"
+                         ))
+                       }else
+                       {
+                         
+                         #Modify names
+                         locPP_params <- buildPreProNames(modelEnv$PP_params)
+                         
+                         #Do preprocessing
+                         Apply_PrePro(locPP_params)
+                         lesNoms <- names(XData_p)
+                         lesFacs <- input$factorsToShow
+                         y <- NULL
+                         
+                         #Apply model
+                         if (modelEnv$model_descript$aggregation=="concatenate"){
+                           for (k in lesNoms){
+                             spdf<-as.data.frame(XData_p[[k]][,-1])
+                             pre <- strsplit(k,"_")[[1]][1]
+                             colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
+                             if (is.null(y)){
+                               y <- spdf
+                             }else
+                             {
+                               y <- cbind(y,spdf)
+                             }
+                           }
+                           data_4_PLSDA <- list(y[-1,])
+                           y <- cbind(Ys_df[lesFacs],y[-1,])
+                         }else
+                         {
+                           
+                           nameList <- as.list(lesNoms)
+                           data_4_PLSDA <- lapply(nameList, function(ii){
+                             y<-data.frame(Ys_df[,1],XData_p[[ii]][-1,-1])
+                              colnames(y)[-1]<-as.character(XData_p[[ii]][1,])
+                             return(y)
+                           })
+                         }
+                         
+                         
+                         shinyjs::hide("modelPlot")
+                         
+                         shinyjs::show("modelTable")
+                         
+                         plsda_probs <- Predict_plsda(modelEnv$model_descript$aggregation,
+                                                      modelEnv$plsdaFit,
+                                                      mydata=data_4_PLSDA,probs=TRUE)
+                         plsda_cl <- Predict_plsda(modelEnv$model_descript$aggregation,
+                                                   modelEnv$plsdaFit,
+                                                   mydata=data_4_PLSDA,probs=FALSE)
+                         
+                         plsda_probs<-round(plsda_probs,2)
+                         lesdiffs<-t(apply(plsda_probs,1,sort,decreasing=TRUE))
+                         lesdiffs<-lesdiffs[,1]-lesdiffs[,2]
+                         lesPreds <<-data.frame(
+                                        Pred_Cl=plsda_cl,
+                                        Pred_prob = plsda_probs,
+                                        minDiff=lesdiffs)
+                         output$modelTable = renderDataTable(cbind(Ys_df[lesFacs],lesPreds),
+                                                             options=list(
+                                                               autoWidth=FALSE,
+                                                               dom = "<lf<\"datatables-scroll\"t>ipr>",
+                                                               rownames = FALSE,
+                                                               class="compact",
+                                                               lengthMenu = list(c(10, 15, 20, -1), c('10', '15', '20','All')),
+                                                               pageLength = 10,
+                                                               # scrollX = TRUE,
+                                                               style = "bootstrap",
+                                                               columnDefs = list(
+                                                                 list(orderable = TRUE, targets = 0),
+                                                                 list(width = '20px', targets = 0),
+                                                                 list(className = "dt-center", targets = "_all")
+                                                                 #columnDefs = list(list(orderable = TRUE, targets = 0)
+                                                               )
+                                                             ),filter='top')
                
-                   }
+                       }
+                    }
              )
       shinyjs::show("saveModelResults")
     })

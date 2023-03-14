@@ -10,46 +10,6 @@
 # Define UI for application that draws a histogram
 
 
-
-lesLibrairies <-
-  c(  "shiny",
-      "shinyjs",
-      "shinyBS",
-      "shinyFiles",
-      "DT",
-      "plotly",
-      "dplyr",
-      "shinyjqui",
-      "rhandsontable",
-      "reactlog",
-      "ggplot2",
-      "ggthemes",
-      "pls",
-      "waiter",
-      "GGally",
-      "ggpubr",
-      "prospectr",
-      "caret",
-      "paletteer"
-  )
-
-cat("Loading libraires!")
-
-lapply(lesLibrairies, library, character.only = TRUE)
-
-
-
-#SET UP PROJECT PATH
-leFichier <- paste0(getwd(),"/www/defPath.RData")
-if (file.exists(leFichier)){
-  load(leFichier)
-  projectDir <<- utils::choose.dir(projectDir)
-}else
-{
-  projectDir <<- utils::choose.dir(fs::path_home_r())
-  save(projectDir,file=leFichier)
-}
-
 # The interface ----
 
 shinyUI(fluidPage(
@@ -466,6 +426,9 @@ shinyUI(fluidPage(
                                        
                                          selectInput('LastPCApplyPCA', 'Last PC',
                                                      choices = "1"),
+                                         selectInput("factorsToShow","Factor for table output",
+                                                     choice=NULL,
+                                                     multiple=T),
                                          actionButton("applyModel",strong("Apply")),
                                          shinySaveButton("saveModelResults", strong("Save results"),
                                                          "Define file name", 
