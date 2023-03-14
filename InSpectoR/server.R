@@ -659,7 +659,7 @@ shinyServer(function(input, output, session) {
       row  <- input$PreProsTrunc_cell_edit$row
       clmn <- input$PreProsTrunc_cell_edit$col+1
       laVal <- as.numeric(input$PreProsTrunc_cell_edit$value)
-      if (clmn<3) {
+      if (clmn<4) {
         # First make sure it is within limits of the raw spectra
         # wvLimits <- range(XData_p[[row]][1,-1])  #RayleighCutoffs
         wvLimits <- range(All_XData[[XDataList[[row]]]][1,-1])    #Raw wavelenght range
@@ -735,7 +735,7 @@ shinyServer(function(input, output, session) {
     
     ## Reacts to save prepro button ----
     observe({
-      volumes <- c("UserFolder"=fs::path_home())
+      volumes <- c("UserFolder"=projectDir)
       shinyFileSave(input, "FSavePrePro", roots=volumes, session=session)
       fileinfo <- parseSavePath(volumes, input$FSavePrePro)
       if (nrow(fileinfo) > 0) {
@@ -752,7 +752,7 @@ shinyServer(function(input, output, session) {
     
     ## Reacts to load prepro button ----
     observe({
-      volumes <- c("UserFolder"=fs::path_home())
+      volumes <- c("UserFolder"=projectDir)
       shinyFileChoose(input, "FLoadPrePro", roots=volumes, session=session)
       fileinfo <- parseFilePaths(volumes, input$FLoadPrePro)
       if (nrow(fileinfo) > 0){
@@ -975,7 +975,7 @@ shinyServer(function(input, output, session) {
     
     ## Reacts to save PLS model button ----
     observe({
-      volumes <- c("UserFolder"=fs::path_home())
+      volumes <- c("UserFolder"=projectDir)
       shinyFileSave(input, "FSavePLS", roots=volumes, session=session)
       fileinfo <- parseSavePath(volumes, input$FSavePLS)
       if (nrow(fileinfo) > 0) {
@@ -1174,30 +1174,32 @@ shinyServer(function(input, output, session) {
     # *********************************************************************
     
     ## Reacts to Save button on modal PlsPredTable ----
-    observeEvent(input$savePLSPreds ,{
-      pl<-plot(plsFit[[1]],plottype = "prediction",
-               ncomp=as.numeric(input$NbLVPLS_Sel),
-               which="train")
-      dev.off(dev.list()["RStudioGD"])
-      dat_tbl=as.data.frame(pl)
-      pl<-plot(plsFit[[1]],plottype = "prediction",
-               ncomp=as.numeric(input$NbLVPLS_Sel),
-               which="validation")
-      dat_tbl=cbind(dat_tbl,as.data.frame(pl)[,2])
-      dat_tbl=cbind(Ys_df[,1],dat_tbl,NoSeq=seq_len(nrow(dat_tbl)))
-      colnames(dat_tbl)[c(1,3,4)]=c(colnames(Ys_df)[1],
-                                    "Training","Validation")
-      
-      outfile=choose.files(caption="Define file name",
-                           multi=FALSE, 
-                           filters=Filters[c("txt"),])
-      utils::write.table(dat_tbl,
-                         file=outfile,
-                         sep="\t",
-                         dec=".",
-                         row.names = FALSE,
-                         quote=FALSE)
-    })
+    observeEvent(input$savePLSPreds,{
+      leFichier <- utils::choose.files(projectDir,multi = F, filters = Filters[c("txt"),])
+      if (length(leFichier) > 0) {
+        isolate({
+          pl<-plot(plsFit[[1]],plottype = "prediction",
+                   ncomp=as.numeric(input$NbLVPLS_Sel),
+                   which="train")
+          dev.off(dev.list()["RStudioGD"])
+          dat_tbl=as.data.frame(pl)
+          pl<-plot(plsFit[[1]],plottype = "prediction",
+                   ncomp=as.numeric(input$NbLVPLS_Sel),
+                   which="validation")
+          dat_tbl=cbind(dat_tbl,as.data.frame(pl)[,2])
+          dat_tbl=cbind(Ys_df[,1],dat_tbl,NoSeq=seq_len(nrow(dat_tbl)))
+          colnames(dat_tbl)[c(1,3,4)]=c(colnames(Ys_df)[1],
+                                        "Training","Validation")
+          
+          utils::write.table(dat_tbl,
+                             file=leFichier,
+                             sep="\t",
+                             dec=".",
+                             row.names = FALSE,
+                             quote=FALSE)
+      })
+    }
+  })
   # PCA tab ----
     
     # *********************************************************************
@@ -1225,7 +1227,7 @@ shinyServer(function(input, output, session) {
           
           updateSelectInput(session, 'PCATopPlotType',
                               selected = 'Screeplot')
-          updateSelectInput(session, "NPCsforPCA", choices=1:lePCA_NCPs)
+          updateSelectInput(session, "NPCsforPCA", choices=2:lePCA_NCPs)
           updateSelectInput(session, "XAxisPCAPlot", 
                             choices = paste0("PC",(1:lePCA_NCPs)))
           updateSelectInput(session, "YAxisPCAPlot",
@@ -1365,18 +1367,20 @@ shinyServer(function(input, output, session) {
     # *********************************************************************
     ## Reacts to Save scores ----
     observe({
-      volumes <- c("UserFolder"=fs::path_home())
+      volumes <- c("UserFolder"=projectDir)
       shinyFileSave(input, "PCAScoresSave", roots=volumes, session=session)
       fileinfo <- parseSavePath(volumes, input$PCAScoresSave)
       if (nrow(fileinfo) > 0) {
         isolate({
-          scores<-lePCA$x[,1:input$NPCsforPCA]
-          row.names(scores)=Ys_df[,1]  #Put sample IDs as row names.
+          scores<-data.frame(ID=Ys_df[,1],lePCA$x[,1:input$NPCsforPCA])
+          # row.names(scores)=Ys_df[,1]  #Put sample IDs as row names.
           #Define column names
           shortNames <- lapply(strsplit(sort(input$XsforPCA),"_"), function(x) x[1])
           pre <- paste(unlist(shortNames),collapse="_")
           colonnes <- paste(pre,paste0("PC",1:input$NPCsforPCA),sep="_")
-          utils::write.table(scores,file=fileinfo$datapath,sep="\t")
+          colnames(scores)[-1] <- colonnes
+          utils::write.table(scores,file=fileinfo$datapath,sep="\t",
+                             row.names=FALSE)
         })
       }
     })
@@ -1386,7 +1390,7 @@ shinyServer(function(input, output, session) {
     # *********************************************************************
     ## Reacts to Save model ----
     observe({
-      volumes <- c("UserFolder"=fs::path_home())
+      volumes <- c("UserFolder"=projectDir)
       shinyFileSave(input, "PCAModelSave", roots=volumes, session=session)
       fileinfo <- parseSavePath(volumes, input$PCAModelSave)
       if (nrow(fileinfo) > 0){
@@ -1867,55 +1871,58 @@ shinyServer(function(input, output, session) {
     # *********************************************************************
     
     ## Reacts to Save button on modal PlsDAPredTable ----
-    observeEvent(input$savePLSDAPreds ,{
-      pr<-Predict_plsda(input$AggregOpForPLSDA, plsdaFit,plsda_set,probs=TRUE)
-      pr<-round(pr,2)
-      lesdiffs<-t(apply(pr,1,sort,decreasing=TRUE))
-      lesdiffs<-lesdiffs[,1]-lesdiffs[,2]
-      lescl<-Predict_plsda(input$AggregOpForPLSDA,plsdaFit,plsda_set,probs=FALSE)
-      letest <- lescl==plsda_set[[1]][,1]
-      pr<-data.frame(NoSeq=Ys_df$NoSeq,
-                     EchID=Ys_df[,1],
-                     True_Cl=plsda_set[[1]][,1],
-                     Pred_Cl=lescl,
-                     Test=letest,
-                     minDiff=lesdiffs,pr)
-      outfile=choose.files(caption="Define file name",
-                           multi=FALSE, 
-                           filters=Filters[c("txt"),])
-      utils::write.table(pr,
-                         file=outfile,
-                         sep="\t",
-                         dec=".",
-                         row.names = FALSE,
-                         quote=FALSE)
+    observeEvent(input$savePLSDAPreds, {
       
+      leFichier <- utils::choose.files(projectDir,multi = F, filters = Filters[c("txt"),])
+      if (length(leFichier) > 0) {
+        isolate({
+          pr<-Predict_plsda(input$AggregOpForPLSDA, plsdaFit,plsda_set,probs=TRUE)
+          pr<-round(pr,2)
+          lesdiffs<-t(apply(pr,1,sort,decreasing=TRUE))
+          lesdiffs<-lesdiffs[,1]-lesdiffs[,2]
+          lescl<-Predict_plsda(input$AggregOpForPLSDA,plsdaFit,plsda_set,probs=FALSE)
+          letest <- lescl==plsda_set[[1]][,1]
+          pr<-data.frame(NoSeq=Ys_df$NoSeq,
+                         EchID=Ys_df[,1],
+                         True_Cl=plsda_set[[1]][,1],
+                         Pred_Cl=lescl,
+                         Test=letest,
+                         minDiff=lesdiffs,pr)
+          utils::write.table(pr,
+                             file=leFichier,
+                             sep="\t",
+                             dec=".",
+                             row.names = FALSE,
+                             quote=FALSE)
+        })
+      }
     })
     
     # *********************************************************************
     
     ## Reacts to save PLSDA model button ----
     observe({
-      volumes <- c("UserFolder"=fs::path_home())
+      volumes <- c("UserFolder"=projectDir)
       shinyFileSave(input, "FSavePLSDA", roots=volumes, session=session)
       fileinfo <- parseSavePath(volumes, input$FSavePLSDA)
       if (nrow(fileinfo) > 0) {
         isolate({
           leFichier <- fileinfo$datapath
           PP_params <- collectPreProParams(PPvaluesTrunc,input)
-          
           #Need to remove some as not all XDataList members are in XsForPLS
           toRemove <- setdiff(PP_params$lesNoms,sort(input$XsForPLSDA))
-          removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
-          PP_params$lesNoms <- as.list(sort(input$XsForPLSDA))
-          PP_params$trunc_limits <- PP_params$trunc_limits[-removeInd,]
-          lapply(toRemove, function(id){
-            PP_params$perSpecParams[[id]] <<- NULL
-            PP_params$savgolParams$doSavGol[[id]] <<- NULL
-            PP_params$savgolParams$w[[id]] <<- NULL
-            PP_params$savgolParams$p[[id]] <<- NULL
-            PP_params$savgolParams$m[[id]] <<- NULL
-          })
+          if (length(toRemove)>0){
+            removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
+            PP_params$lesNoms <- as.list(sort(input$XsForPLSDA))
+            PP_params$trunc_limits <- PP_params$trunc_limits[-removeInd,]
+            lapply(toRemove, function(id){
+              PP_params$perSpecParams[[id]] <<- NULL
+              PP_params$savgolParams$doSavGol[[id]] <<- NULL
+              PP_params$savgolParams$w[[id]] <<- NULL
+              PP_params$savgolParams$p[[id]] <<- NULL
+              PP_params$savgolParams$m[[id]] <<- NULL
+            })
+          }
           nom_lesX <- sort(input$XsForPLSDA)
           shortNames <- sapply(strsplit(nom_lesX,'_'),"[[",1)
           model_descript <- list(
@@ -1970,7 +1977,7 @@ shinyServer(function(input, output, session) {
     
     ## Reacts to FLoadModel button ----
     observe({
-      volumes <- c("UserFolder"=fs::path_home())
+      volumes <- c("UserFolder"=projectDir)
       shinyFileChoose(input, "FLoadModel", roots=volumes, session=session)
       fileinfo <- parseFilePaths(volumes, input$FLoadModel)
       if (nrow(fileinfo) > 0){
@@ -1987,8 +1994,10 @@ shinyServer(function(input, output, session) {
           shinyjs::show("FirstPCApplyPCA")
           shinyjs::show("LastPCApplyPCA")
           shinyjs::hide("saveModelResults")
+          updateSelectInput(session,"FirstPCApplyPCA",
+                            choices=1:(as.numeric(modelEnv$NCPs)-1), selected=1)
           updateSelectInput(session,"LastPCApplyPCA",
-                            choices=1:modelEnv$NCPs, selected=modelEnv$NCPs)
+                            choices=2:modelEnv$NCPs, selected=2)
         }else         #required data not available
           output$dataTypeOnApply <- renderText(paste0("Required data types\n",
                                                       "not available.\n",
@@ -2053,7 +2062,7 @@ shinyServer(function(input, output, session) {
                         colorCodes <-factor(c(as.character(modelEnv$colorby),rep("Pred.",nrow(lesPreds))),
                                                levels <- c(as.character(unique(modelEnv$colorby)),
                                                            "Pred."))
-                        dats <- cbind(dats,as.data.frame(colorCodes))
+                        #dats <- cbind(dats,as.data.frame(colorCodes))
                         nCl <- length(unique(modelEnv$colorby))
                         
                         couleurs <- c(mesCouleurs[1:nCl],"#000000FF")
@@ -2096,8 +2105,8 @@ shinyServer(function(input, output, session) {
                         # #Lower as PCs scatter
                         for (i in (i1+1):i2){
                           for (j in i1:(i-1)){
-                            kk <- (j-1)*N+i
-                            df <- cbind(dats[,c(j,i)],as.data.frame(colorCodes),
+                            kk <- (j-i1)*N+(i-i1+1)
+                            df <- cbind(dats[,c(j-i1+1,i-i1+1)],as.data.frame(colorCodes),
                                        row.names=NULL)
                              nom1 <- names(df)[1]
                              nom2 <- names(df)[2]
@@ -2114,10 +2123,10 @@ shinyServer(function(input, output, session) {
                         # #Diag as densities
                         pos <- c(1,5,9)
                         for (i in i1:i2){
-                          df <- cbind(dats[,i],as.data.frame(colorCodes),
+                          df <- cbind(dats[,(i-i1+1)],as.data.frame(colorCodes),
                                       row.names=NULL)
                           nom1 <- names(df)[1]
-                          sp[[(i-1)*N+i]] <-
+                          sp[[(i-i1)*N+(i-i1+1)]] <-
                             ggplot2::ggplot(df, ggplot2::aes(x=.data[[nom1]],
                                                              fill=colorCodes)) +
                             ggplot2::geom_density(adjust=1.5, alpha=.6, show.legend=FALSE) +
@@ -2135,7 +2144,7 @@ shinyServer(function(input, output, session) {
                         scs <- lesPreds
                         eigVals <- modelEnv$lePCA$sdev[1:modelEnv$NCPs] 
                         midMat <- diag(1/eigVals^2)
-                        SD <- sqrt(diag(scs %*% midMat %*% t(scs)))
+                        mySD <- sqrt(diag(scs %*% midMat %*% t(scs)))
                         
                         x <- as.matrix(data_4_PCA-matrix(modelEnv$lePCA$center,
                                                          nrow=nrow(data_4_PCA),
@@ -2143,11 +2152,11 @@ shinyServer(function(input, output, session) {
                                                          byrow = T))
                         lds <- modelEnv$lePCA$rotation[,1:modelEnv$NCPs]
                         midMat <- diag(nrow=dim(x)[2]) - lds %*% t(lds)
-                        OD <- sqrt(diag(x %*% midMat %*% t(x)))
+                        myOD <- sqrt(diag(x %*% midMat %*% t(x)))
                         
                         
-                        df <- data.frame(SD=c(modelEnv$dds$SDist, SD),
-                                         OD=c(modelEnv$dds$ODist, OD),
+                        df <- data.frame(SD=c(modelEnv$dds$SDist, mySD),
+                                         OD=c(modelEnv$dds$ODist, myOD),
                                          colorCodes = colorCodes)
                         nom1 <- names(df)[1]
                         nom2 <- names(df)[2]
@@ -2190,7 +2199,7 @@ shinyServer(function(input, output, session) {
     
     ## Reacts to saveModelResults button ----
     observe({
-      volumes <- c("UserFolder"=fs::path_home())
+      volumes <- c("UserFolder"=projectDir)
       shinyFileSave(input, "saveModelResults", roots=volumes, session=session)
       fileinfo <- parseSavePath(volumes, input$saveModelResults)
       if (nrow(fileinfo) > 0) {

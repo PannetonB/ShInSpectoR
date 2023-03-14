@@ -35,7 +35,20 @@ lesLibrairies <-
       "paletteer"
   )
 
+cat("Loading libraires!")
+
 chargeLibs(lesLibrairies)
+
+#SET UP PROJECT PATH
+leFichier <- paste0(getwd(),"/www/defPath.RData")
+if (file.exists(leFichier)){
+  load(leFichier)
+  projectDir <<- utils::choose.dir(projectDir)
+}else
+{
+  projectDir <<- utils::choose.dir(fs::path_home_r())
+  save(projectDir,file=leFichier)
+}
 
 # The interface ----
 
@@ -182,7 +195,7 @@ shinyUI(fluidPage(
                                          selectInput('XsforPCA','Spectrum types for PCA',
                                                      choices=character(0L),multiple=T),
                                          selectInput("NPCsforPCA", "Select number of PCs",
-                                                     choices=1:2),
+                                                     choices=2:2),
                                          hr(),
                                          h4(strong('Plotting options')),
                                          selectInput('PCATopPlotType','Choose plot type',
@@ -284,7 +297,8 @@ shinyUI(fluidPage(
                                            bsModal("PLSDAPreds", "PLSDA predictions",
                                                    "ShowPLSDAPredTable", size = "large",
                                                    dataTableOutput("PlsDAPredTable"),
-                                                   actionButton('savePLSDAPreds','Save')),
+                                                   actionButton('savePLSDAPreds',strong("Save"))),
+                                                  
                                            hr(),
                                            shinySaveButton("FSavePLSDA", strong("Save model"),
                                                            "Save PLS model to file", 
@@ -383,8 +397,7 @@ shinyUI(fluidPage(
                                                actionButton('ShowPLSPredTable',"Show prediction table"),
                                                bsModal("PLSPreds", "PLS predictions", "ShowPLSPredTable", size = "large",
                                                        dataTableOutput("PlsPredTable"),
-                                                       actionButton('savePLSPreds','Save'))
-                                             
+                                                       actionButton('savePLSPreds',strong('Save')))
                                       ),
                                       column(9, offset=1,
                                                textOutput("PLSPlotID"),
