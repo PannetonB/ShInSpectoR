@@ -11,8 +11,6 @@
 
 
 
-# Load libraries ----
-
 lesLibrairies <-
   c(  "shiny",
       "shinyjs",
@@ -37,7 +35,9 @@ lesLibrairies <-
 
 cat("Loading libraires!")
 
-chargeLibs(lesLibrairies)
+lapply(lesLibrairies, library, character.only = TRUE)
+
+
 
 #SET UP PROJECT PATH
 leFichier <- paste0(getwd(),"/www/defPath.RData")

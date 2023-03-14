@@ -237,28 +237,30 @@ shinyServer(function(input, output, session) {
     # *********************************************************************
     
     ## Plot loadings in a modal window ----
-    output$loadingPlots <- renderPlotly({
-        if (all(stringr::str_detect(c(input$pc1,input$pc2),"PC"))){
-            lePCA <- PCAsDT[[input$PCA_data]]
-            whichData <- which(input$PCA_data==names(PCAsDT))
-            colPC1 <- which(colnames(lePCA$x)==input$pc1)
-            colPC2 <- which(colnames(lePCA$x)==input$pc2)
-            ys1 <- lePCA$rotation[,colPC1]  #First PC loadings
-            ys2 <-lePCA$rotation[,colPC2]  #Second PC loadings
-            xs <- as.numeric(rownames(lePCA$rotation))
-            plotdf <- data.frame(Wavelength=xs, Loadings1=ys1,Loadings2=ys2)
-            p1 <- plot_ly(plotdf, x = ~Wavelength, y = ~Loadings1 ,type='scatter',mode="line" ) %>%
-                layout(title = input$PCA_data,
-                       xaxis=list(title='Wavenumber or Wavelength'), 
-                       yaxis=list(title=input$pc1))
-            p2 <- plot_ly(plotdf, x = ~Wavelength, y = ~Loadings2 ,type='scatter',mode="line" , showlegend=F) %>%
-                layout(xaxis=list(title='Wavenumber or Wavelength'), 
-                       yaxis=list(title=input$pc2))
-            subplot(p1, p2, nrows=2, shareX = TRUE, titleY = TRUE)
-        }else
-        {
-            plotly_empty(type='scatter',mode="markers")
-        }
+    observeEvent(input$plotloadings,{
+      output$loadingPlots <- renderPlotly({
+          if (all(stringr::str_detect(c(input$pc1,input$pc2),"PC"))){
+              lePCA <- PCAsDT[[input$PCA_data]]
+              whichData <- which(input$PCA_data==names(PCAsDT))
+              colPC1 <- which(colnames(lePCA$x)==input$pc1)
+              colPC2 <- which(colnames(lePCA$x)==input$pc2)
+              ys1 <- lePCA$rotation[,colPC1]  #First PC loadings
+              ys2 <-lePCA$rotation[,colPC2]  #Second PC loadings
+              xs <- as.numeric(rownames(lePCA$rotation))
+              plotdf <- data.frame(Wavelength=xs, Loadings1=ys1,Loadings2=ys2)
+              p1 <- plot_ly(plotdf, x = ~Wavelength, y = ~Loadings1 ,type='scatter',mode="line" ) %>%
+                  layout(title = input$PCA_data,
+                         xaxis=list(title='Wavenumber or Wavelength'), 
+                         yaxis=list(title=input$pc1))
+              p2 <- plot_ly(plotdf, x = ~Wavelength, y = ~Loadings2 ,type='scatter',mode="line" , showlegend=F) %>%
+                  layout(xaxis=list(title='Wavenumber or Wavelength'), 
+                         yaxis=list(title=input$pc2))
+              subplot(p1, p2, nrows=2, shareX = TRUE, titleY = TRUE)
+          }else
+          {
+              plotly_empty(type='scatter',mode="markers")
+          }
+      })
     })
     
     
@@ -681,6 +683,11 @@ shinyServer(function(input, output, session) {
       {
         PPvaluesTrunc$dfWorking$x$data[row, clmn] <- laVal
         RayleighCutoffs[[inserted_perSpectrumOptions()[row]]] <<- laVal
+        #Make sur lower limit is greater than Rayleigh
+        lolim <- PPvaluesTrunc$dfWorking$x$data[row, 2]
+        if (lolim<laVal){ 
+          PPvaluesTrunc$dfWorking$x$data[row, 2] <- laVal
+        }
       }
       output$PreProsTrunc <- renderDataTable({
         PPvaluesTrunc$dfWorking

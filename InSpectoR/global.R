@@ -229,7 +229,7 @@ computePCAsDT <- function(nCP,dum, leNom)
   
   dum[-1,-1] <- dats
   rownames(pcdum$rotation) <- dum[1,-1]
-  colnames(pcdum$rotation) <- dum[-1,1][1:nCP]
+  colnames(pcdum$rotation) <- paste0("PC",(1:nCP))
   PCAsDT[[leNom]] <<- pcdum
   lesChoix <- colnames(pcdum$x)
   return(lesChoix)
