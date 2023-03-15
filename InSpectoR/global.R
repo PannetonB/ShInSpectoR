@@ -143,6 +143,7 @@ Apply_PrePro <- function(preproParams)
   
   trunc_limits <- preproParams$trunc_limits
   lesNoms <- preproParams$lesNoms
+  XData_p <<- list()
   
   lapply(lesNoms,function(leNom){
     wl<-All_XData[[leNom]][1,-1]

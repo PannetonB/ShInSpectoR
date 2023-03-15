@@ -1,34 +1,5 @@
 #
-#Server for ShInSpectoR# Load libraries ----
-
-
-
-lesLibrairies <-
-  c(  "shiny",
-      "shinyjs",
-      "shinyBS",
-      "shinyFiles",
-      "DT",
-      "plotly",
-      "dplyr",
-      "shinyjqui",
-      "rhandsontable",
-      "reactlog",
-      "ggplot2",
-      "ggthemes",
-      "pls",
-      "waiter",
-      "GGally",
-      "ggpubr",
-      "prospectr",
-      "caret",
-      "paletteer",
-      "here"
-  )
-
-cat("Loading libraires!")
-
-lapply(lesLibrairies, require, character.only = TRUE)
+#Server for ShInSpectoR
 
 
 
@@ -1034,16 +1005,18 @@ shinyServer(function(input, output, session) {
           
           #Need to remove some as not all XDataList members are in XsForPLS
           toRemove <- setdiff(PP_params$lesNoms,sort(input$XsForPLS))
-          removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
-          PP_params$lesNoms <- as.list(sort(input$XsForPLS))
-          PP_params$trunc_limits <- PP_params$trunc_limits[-removeInd,]
-          lapply(toRemove, function(id){
-            PP_params$perSpecParams[[id]] <<- NULL
-            PP_params$savgolParams$doSavGol[[id]] <<- NULL
-            PP_params$savgolParams$w[[id]] <<- NULL
-            PP_params$savgolParams$p[[id]] <<- NULL
-            PP_params$savgolParams$m[[id]] <<- NULL
-          })
+          if (length(toRemove)>0){
+            removeInd <- unlist(lapply(toRemove, function(x) which(x==PP_params$lesNoms)))
+            PP_params$lesNoms <- as.list(sort(input$XsForPLS))
+            PP_params$trunc_limits <- PP_params$trunc_limits[-removeInd,]
+            lapply(toRemove, function(id){
+              PP_params$perSpecParams[[id]] <<- NULL
+              PP_params$savgolParams$doSavGol[[id]] <<- NULL
+              PP_params$savgolParams$w[[id]] <<- NULL
+              PP_params$savgolParams$p[[id]] <<- NULL
+              PP_params$savgolParams$m[[id]] <<- NULL
+            })
+          }
           nom_lesX <- sort(input$XsForPLS)
           shortNames <- sapply(strsplit(nom_lesX,'_'),"[[",1)
           model_descript <- list(
@@ -1224,7 +1197,8 @@ shinyServer(function(input, output, session) {
     
     ## Reacts to Save button on modal PlsPredTable ----
     observeEvent(input$savePLSPreds,{
-      leFichier <- utils::choose.files(projectDir,multi = F, filters = Filters[c("txt"),])
+      leFichier <- utils::choose.files(paste0(projectDir,"\\*.*"),
+                                       multi = F, filters = Filters[c("txt"),])
       if (length(leFichier) > 0) {
         isolate({
           pl<-plot(plsFit[[1]],plottype = "prediction",
@@ -1922,7 +1896,8 @@ shinyServer(function(input, output, session) {
     ## Reacts to Save button on modal PlsDAPredTable ----
     observeEvent(input$savePLSDAPreds, {
       
-      leFichier <- utils::choose.files(projectDir,multi = F, filters = Filters[c("txt"),])
+      leFichier <- utils::choose.files(paste0(projectDir,"\\*.*"),
+                                       multi = F, filters = Filters[c("txt"),])
       if (length(leFichier) > 0) {
         isolate({
           pr<-Predict_plsda(input$AggregOpForPLSDA, plsdaFit,plsda_set,probs=TRUE)
@@ -2249,8 +2224,77 @@ shinyServer(function(input, output, session) {
                       }
                    },
              PLS = {
-               
-                   },
+                   #ID required spectrum types and make sur names in
+                   #modelEnv matches names of spectrum types.
+                   shortTypeMod <- getShortType(modelEnv$model_descript$datatype)
+                   shortTypeLoaded <- getShortType(sort(ALLXDataList))
+                   lesTypes <- shortTypeMod %in% shortTypeLoaded 
+                   if (!all(lesTypes)){ #not good to go!
+                     showModal(modalDialog(
+                       title = "WARNING",
+                       "Selected spectrum types do not match!"
+                     ))
+                   }else
+                   {
+                     
+                     #Modify names
+                     locPP_params <- buildPreProNames(modelEnv$PP_params)
+                     
+                     #Do preprocessing
+                     Apply_PrePro(locPP_params)
+                     lesNoms <- names(XData_p)
+                     lesFacs <- input$factorsToShow
+                     y <- NULL
+                     
+                     #Apply model
+                     for (k in lesNoms){
+                         spdf<-as.data.frame(XData_p[[k]][,-1])
+                         pre <- strsplit(k,"_")[[1]][1]
+                         colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
+                         if (is.null(y)){
+                           y <- spdf
+                         }else
+                         {
+                           y <- cbind(y,spdf)
+                         }
+                       }
+                       data_4_PLSDA <- list(y[-1,])
+                       y <- cbind(Ys_df[lesFacs],y[-1,])
+                     }
+                     
+                     
+                     shinyjs::hide("modelPlot")
+                     
+                     shinyjs::show("modelTable")
+                     
+                     pls_set <<- y
+                     
+                     plspreds<-predict(modelEnv$plsFit[[1]],
+                                       newdata = pls_set,
+                                       ncomp=modelEnv$pls_ncomp)
+                     
+                     lesPreds <<-data.frame(Prediction=plspreds)
+                     output$modelTable = renderDataTable(cbind(Ys_df[lesFacs],lesPreds),
+                                                         options=list(
+                                                           autoWidth=FALSE,
+                                                           dom = "<lf<\"datatables-scroll\"t>ipr>",
+                                                           rownames = FALSE,
+                                                           class="compact",
+                                                           lengthMenu = list(c(10, 15, 20, -1), c('10', '15', '20','All')),
+                                                           pageLength = 10,
+                                                           # scrollX = TRUE,
+                                                           style = "bootstrap",
+                                                           columnDefs = list(
+                                                             list(orderable = TRUE, targets = 0),
+                                                             list(width = '20px', targets = 0),
+                                                             list(className = "dt-center", targets = "_all")
+                                                             #columnDefs = list(list(orderable = TRUE, targets = 0)
+                                                           )
+                                                         ),filter='top')
+                     
+                     
+                   
+                     },
              PLSDA = {
                        #ID required spectrum types and make sur names in
                        #modelEnv matches names of spectrum types.
@@ -2295,7 +2339,7 @@ shinyServer(function(input, output, session) {
                            nameList <- as.list(lesNoms)
                            data_4_PLSDA <- lapply(nameList, function(ii){
                              y<-data.frame(Ys_df[,1],XData_p[[ii]][-1,-1])
-                              colnames(y)[-1]<-as.character(XData_p[[ii]][1,])
+                              colnames(y)<-as.character(XData_p[[ii]][1,])
                              return(y)
                            })
                          }

@@ -9,7 +9,34 @@
 
 # Define UI for application that draws a histogram
 
+# Load libraries ----
 
+lesLibrairies <-
+  c(  "shiny",
+      "shinyjs",
+      "shinyBS",
+      "shinyFiles",
+      "DT",
+      "plotly",
+      "dplyr",
+      "shinyjqui",
+      "rhandsontable",
+      "reactlog",
+      "ggplot2",
+      "ggthemes",
+      "pls",
+      "waiter",
+      "GGally",
+      "ggpubr",
+      "prospectr",
+      "caret",
+      "paletteer",
+      "here"
+  )
+
+cat("Loading libraires!")
+
+lapply(lesLibrairies, require, character.only = TRUE)
 # The interface ----
 
 shinyUI(fluidPage(
