@@ -1,7 +1,9 @@
 #
 #Server for ShInSpectoR
 
+#Increase upload limit to 30 Megs
 
+options(shiny.maxRequestSize=30*1024^2) 
 
 #SET UP PROJECT PATH
 leFichier <- here("InSpectoR","www","defPath.RData")
@@ -306,7 +308,6 @@ shinyServer(function(input, output, session) {
         #make.unique to deal with repeated sample ID.
         Ys_df[,1] <<- as.factor(make.unique(as.character(Ys_df[,1])))
         Ys_df <<- cbind(Ys_df,data.frame(NoSeq=seq(1:nrow(Ys_df))))
-        ORI_Ys_df <<- Ys_df
         #load all XData in All_XData
         indi <- which(!stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
         # indiDebug <<- indi
@@ -333,7 +334,38 @@ shinyServer(function(input, output, session) {
                 }
             }
         }
+        
+        #Remove rows where constant values are found
+        rowInd <- numeric()
+        for (k in 1:length(All_XData)){
+          rowInd <- unique(c(rowInd,
+                             which(apply(All_XData[[k]][,-1], 1, 
+                                         function(i) length(unique(i))==1)
+                                   )))
+        }
+        if (length(rowInd)>0){
+          showModal(modalDialog(       #Some constant lines
+            title="WARNING", 
+            paste("Some spectra are constants. Corresponding sample will be removed."),
+            icon=("alert - warning")
+          ))
+        }
+        if (length(rowInd)==nrow(Ys_df)){
+          showModal(modalDialog(       #Some constant lines
+            title="WARNING", 
+            paste("Invalid data set!"),
+            icon=("alert - warning")
+          ))
+          return()
+        }
+        Ys_df <<- Ys_df[-(rowInd-1),]
+        All_XData <<- lapply(All_XData, function(x) x[-rowInd,])
+        
+        
+        ORI_Ys_df <<- Ys_df
         ORI_XData <<- All_XData
+        
+        
         #files are loaded - remove extension from filenames
         inFile$name<- tools::file_path_sans_ext((inFile$name))
         
@@ -578,6 +610,27 @@ shinyServer(function(input, output, session) {
     # *********************************************************************
     
     
+    ## Reacts to deleteAll button ----
+    observeEvent(input$deleteAll, {
+      lesRows <- input$Ys_rows_all
+      
+      #Remove rows in All_XData, .
+      #Recompute PCAs and update PCAs, PCAsdt_dds and PCAsdt_dds_crit
+      Yvalues$dfWorking$x$data <- Yvalues$dfWorking$x$data[-lesRows,]
+      Ys_df <<- Yvalues$dfWorking$x$data
+      for (k in 1:length(All_XData)){
+        All_XData[[k]] <<- All_XData[[k]][-(1+lesRows),]
+      }
+      
+      for (k in 1:length(XData_p)){
+        XData_p[[k]] <<- XData_p[[k]][-(1+lesRows),]
+      }
+      lesChoix <- computePCAonRaw(as.numeric(input$npcs),doRayleigh=FALSE)
+      proxy_Ys %>% selectRows(NULL)
+    })
+    # *********************************************************************
+    
+    
     ## Reacts to restoreOriData button ----
     observeEvent(input$restoreOriData, {
         Ys_df <<- ORI_Ys_df
@@ -797,6 +850,8 @@ shinyServer(function(input, output, session) {
             PP_params$savgolParams$p[[id]] <- prepro_params$p[i]
             PP_params$savgolParams$m[[id]] <- prepro_params$m[i]
           }
+          PP_params$trunc_limits <- data.frame(PP_params$trunc_limits)
+          
         }
         
         PP_params <- buildPreProNames(PP_params)
@@ -1210,7 +1265,7 @@ shinyServer(function(input, output, session) {
                    ncomp=as.numeric(input$NbLVPLS_Sel),
                    which="validation")
           dat_tbl=cbind(dat_tbl,as.data.frame(pl)[,2])
-          dat_tbl=cbind(Ys_df[,1],dat_tbl,NoSeq=seq_len(nrow(dat_tbl)))
+          dat_tbl=cbind(Ys_df,dat_tbl,NoSeq=seq_len(nrow(dat_tbl)))
           colnames(dat_tbl)[c(1,3,4)]=c(colnames(Ys_df)[1],
                                         "Training","Validation")
           
@@ -2396,7 +2451,7 @@ shinyServer(function(input, output, session) {
       fileinfo <- parseSavePath(volumes, input$saveModelResults)
       if (nrow(fileinfo) > 0) {
         leFichier <- fileinfo$datapath
-        outDF <- cbind(Ys_df,lesPreds)
+        outDF <- cbind(Ys_df,data.frame(Prediction=lesPreds))
         utils::write.table(outDF,file=leFichier,
                            row.names=FALSE, sep="\t")
         

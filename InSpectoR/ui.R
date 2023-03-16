@@ -120,6 +120,7 @@ shinyUI(fluidPage(
                                    actionButton("restoreOriData", "Restore data set"),
                                    hr(),
                                    actionButton("selectAll","Select all shown"),
+                                   actionButton("deleteAll", "Delete all shown"),
                                    actionButton("clearAllFilters","Clear filters"),
                                    hr(style = "border-top: 1px solid #FFFFFF;"),
                                    fluidRow(DT::dataTableOutput('Ys',
