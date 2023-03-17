@@ -349,18 +349,23 @@ shinyServer(function(input, output, session) {
             paste("Some spectra are constants. Corresponding sample will be removed."),
             icon=("alert - warning")
           ))
+          Ys_df <<- Ys_df[-(rowInd-1),]
+          All_XData <<- lapply(All_XData, function(x) x[-rowInd,])
         }
         if (length(rowInd)==nrow(Ys_df)){
-          showModal(modalDialog(       #Some constant lines
+          showModal(modalDialog(       #Something really wrong
             title="WARNING", 
             paste("Invalid data set!"),
             icon=("alert - warning")
           ))
           return()
         }
-        Ys_df <<- Ys_df[-(rowInd-1),]
-        All_XData <<- lapply(All_XData, function(x) x[-rowInd,])
         
+        #Flip All_XData to wavelength in increasing order!
+        All_XData <<- lapply(All_XData, function(x){
+          x[,-1] <- x[,-1][,order(as.numeric(x[1,-1]))]
+          x
+        })
         
         ORI_Ys_df <<- Ys_df
         ORI_XData <<- All_XData
