@@ -41,7 +41,7 @@ lapply(lesLibrairies, require, character.only = TRUE)
 # The interface ----
 
 shinyUI(fluidPage(
-    theme = shinytheme("flatly"),
+    theme = shinytheme("cerulean"),
     useShinyjs(),
     use_waiter(),
     ##Darker horizontal line ----
@@ -116,7 +116,7 @@ shinyUI(fluidPage(
                         
                         mainPanel(width = 10,
                              # Show a plot of the generated distribution
-                            column(4, 
+                            column(5, 
                                    actionButton('clearRows', 'Clear Selection'),
                                    actionButton("deleteRows", "Delete Selected"),
                                    actionButton("restoreOriData", "Restore data set"),
@@ -128,7 +128,7 @@ shinyUI(fluidPage(
                                    hr(style = "border-top: 1px solid #FFFFFF;"),
                                    fluidRow(DT::dataTableOutput('Ys',
                                                                 height='auto',
-                                                                width='600px'
+                                                                width='auto'
                                                                 )
                                             )
                                    ),

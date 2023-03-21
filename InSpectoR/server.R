@@ -290,7 +290,7 @@ shinyServer(function(input, output, session) {
     
     # *********************************************************************
     
-    ## Loads data ----
+     ## Loads data ----
     observeEvent(input$files, {
         k=1
         inFile <- input$files
@@ -309,6 +309,7 @@ shinyServer(function(input, output, session) {
         #make.unique to deal with repeated sample ID.
         Ys_df[,1] <<- as.factor(make.unique(as.character(Ys_df[,1])))
         Ys_df <<- cbind(Ys_df,data.frame(NoSeq=seq(1:nrow(Ys_df))))
+        Ys_df <- droplevels(Ys_df)
         #load all XData in All_XData
         indi <- which(!stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
         # indiDebug <<- indi
@@ -424,7 +425,7 @@ shinyServer(function(input, output, session) {
                                     columnDefs = list(
                                       list(orderable = TRUE, targets = 0),
                                       list(width = '15px', targets = 0),
-                                      list(width = '75px', targets = 1:(ncol(Ys_df)-1)),
+                                      list(width = '100px', targets = 1:(ncol(Ys_df)-1)),
                                       list(className = "dt-center", targets = "_all")
                                       #columnDefs = list(list(orderable = TRUE, targets = 0)
                                     )
@@ -600,9 +601,9 @@ shinyServer(function(input, output, session) {
       if (sum(lesCols)==1){
         #Perform operation
         leFiltre <- input$Ys_search_columns[lesCols]
-        leFiltre <- gsub('[^[:alnum:], ]','',leFiltre)
+        leFiltre <- gsub('[^[:alnum:],_ ]','',leFiltre)
         leFiltre <- unlist(strsplit(leFiltre,','))
-        allOptions <- as.character(unique(Ys_df[,lesCols]))
+        allOptions <- levels(Ys_df[,lesCols])
         leFiltre <- sapply(leFiltre, FUN= function(x) which(x==allOptions))
         r_state <- list()
         r_state$dataviewer_search_columns <- as.list(rep("",length(lesCols)))
@@ -629,7 +630,7 @@ shinyServer(function(input, output, session) {
                                   columnDefs = list(
                                     list(orderable = TRUE, targets = 0),
                                     list(width = '15px', targets = 0),
-                                    list(width = '75px', targets = 1:(ncol(Ys_df)-1)),
+                                    list(width = '100px', targets = 1:(ncol(Ys_df)-1)),
                                     list(className = "dt-center", targets = "_all")
                                     #columnDefs = list(list(orderable = TRUE, targets = 0)
                                   ),
@@ -646,7 +647,7 @@ shinyServer(function(input, output, session) {
       {#display warning
         showModal(modalDialog(
           title = "WARNING",
-          "Selected spectrum types do not match!"
+          "Only one filtered column allowed!"
         ))
       }
       
