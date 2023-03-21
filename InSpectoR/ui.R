@@ -16,6 +16,7 @@ lesLibrairies <-
       "shinyjs",
       "shinyBS",
       "shinyFiles",
+      "shinythemes",
       "DT",
       "plotly",
       "dplyr",
@@ -40,6 +41,7 @@ lapply(lesLibrairies, require, character.only = TRUE)
 # The interface ----
 
 shinyUI(fluidPage(
+    theme = shinytheme("flatly"),
     useShinyjs(),
     use_waiter(),
     ##Darker horizontal line ----
@@ -116,12 +118,13 @@ shinyUI(fluidPage(
                              # Show a plot of the generated distribution
                             column(4, 
                                    actionButton('clearRows', 'Clear Selection'),
-                                   actionButton("deleteRows", "Delete Selected Rows"),
+                                   actionButton("deleteRows", "Delete Selected"),
                                    actionButton("restoreOriData", "Restore data set"),
+                                   actionButton("clearAllFilters","Clear filters"),
                                    hr(),
                                    actionButton("selectAll","Select all shown"),
                                    actionButton("deleteAll", "Delete all shown"),
-                                   actionButton("clearAllFilters","Clear filters"),
+                                   actionButton("flipSelection","Set selection complement"),
                                    hr(style = "border-top: 1px solid #FFFFFF;"),
                                    fluidRow(DT::dataTableOutput('Ys',
                                                                 height='auto',
@@ -129,7 +132,7 @@ shinyUI(fluidPage(
                                                                 )
                                             )
                                    ),
-                            column(6, offset=2, 
+                            column(6, offset=1, 
                                    fluidRow(plotlyOutput("spectraPlots", 
                                                        height="400px",
                                                        width="auto")

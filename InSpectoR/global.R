@@ -309,7 +309,7 @@ computePCAonRaw <- function(nCP, doRayleigh=FALSE)
 #***********************************************************************
 
 doPCA <- function(dats){
-  thr=0.01
+  thr=0.005
   dat_4_PCA <<- dats[-1,-1]
   lePCA <<- prcomp(dat_4_PCA,tol=thr)
   lePCA_NCPs <<-ncol(lePCA$rotation)

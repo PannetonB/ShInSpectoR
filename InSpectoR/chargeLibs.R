@@ -5,6 +5,7 @@ lesLibrairies <-
       "shinyjs",
       "shinyBS",
       "shinyFiles",
+      "shinythemes",
       "DT",
       "plotly",
       "dplyr",

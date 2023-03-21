@@ -156,6 +156,7 @@ shinyServer(function(input, output, session) {
         dfsPCA <- as.data.frame(PCAsDT[[lePCA]]$x)
         dfsPCA <- cbind(dfsPCA,Ys_df[input$pcaPtColorBy])
         nColor <- length(unique(dfsPCA[[input$pcaPtColorBy]]))
+        suppressWarnings(colIndices <- (1:10 + rep(0,nColor))[1:nColor])
         
         ### Something was selected ----
         if (length(s)) {
@@ -171,9 +172,9 @@ shinyServer(function(input, output, session) {
                             x=lepc1, y=lepc2,
                             type = "scatter", mode = "markers",
                             color=ptColor,
-                            colors = mycolors[1:nColor],
+                            colors = mycolors[colIndices],
                             size=8,
-                            text=as.character(Ys_df[[1]]),
+                            text=I(as.character(Ys_df[[1]])),
                             hovertext=as.character(Ys_df[,input$pcaPtColorBy]),
                             hovertemplate = paste('EchID: %{text}')) %>%
                 add_markers(data=dfsPCA_sel,     #Circle selected in red
@@ -218,9 +219,9 @@ shinyServer(function(input, output, session) {
                         x=lepc1, y=lepc2,
                         type = "scatter", mode = "markers",
                         color=ptColor,
-                        colors = mycolors[1:nColor],
+                        colors = mycolors[colIndices],
                         size=8,
-                        text=as.character(Ys_df[[1]]),
+                        text=I(as.character(Ys_df[[1]])),
                         hovertext=as.character(Ys_df[,input$pcaPtColorBy]),
                         hovertemplate = paste('EchID: %{text}')) %>% 
             layout(dragmode = "select") %>%
@@ -411,6 +412,7 @@ shinyServer(function(input, output, session) {
         #Table of Ys
         dtable <- DT::datatable(Ys_df, width = '900px',
                                 options=list(
+                                    server=TRUE,
                                     autoWidth=FALSE,
                                     dom = "<lf<\"datatables-scroll\"t>ipr>",
                                     rownames = FALSE,
@@ -427,7 +429,7 @@ shinyServer(function(input, output, session) {
                                       #columnDefs = list(list(orderable = TRUE, targets = 0)
                                     )
                                 ),
-                                filter='top')
+                                filter=list(position = 'top', clear = FALSE))
         dtable$x$data[[1]] <- as.numeric(dtable$x$data[[1]])-1
         #Force name of column for sample ID to ID
         colnames(dtable$x$data)[2] <- "ID"  #by default row number (0 based) on
@@ -589,6 +591,67 @@ shinyServer(function(input, output, session) {
     })
     
     
+    
+    # *********************************************************************
+    
+    ## Reacts to flipSelection button ----
+    observeEvent(input$flipSelection, {
+      lesCols <- (input$Ys_search_columns) != ""
+      if (sum(lesCols)==1){
+        #Perform operation
+        leFiltre <- input$Ys_search_columns[lesCols]
+        leFiltre <- gsub('[^[:alnum:], ]','',leFiltre)
+        leFiltre <- unlist(strsplit(leFiltre,','))
+        allOptions <- as.character(unique(Ys_df[,lesCols]))
+        leFiltre <- sapply(leFiltre, FUN= function(x) which(x==allOptions))
+        r_state <- list()
+        r_state$dataviewer_search_columns <- as.list(rep("",length(lesCols)))
+        leFiltre <- paste0('[',
+                          paste0('\"',
+                                 allOptions[-leFiltre],
+                                 '\"',collapse = ",")
+                          ,']')
+        r_state$dataviewer_search_columns[[which(lesCols)+1]] <-leFiltre
+        mknl <- function(x) list(search = x)
+        
+        dtable <- DT::datatable(Ys_df, width = '900px',
+                                options=list(
+                                  server=TRUE,
+                                  autoWidth=FALSE,
+                                  dom = "<lf<\"datatables-scroll\"t>ipr>",
+                                  rownames = FALSE,
+                                  class="compact",
+                                  lengthMenu = list(c(10, 15, 20, -1), c('10', '15', '20','All')),
+                                  pageLength = 10,
+                                  # scrollX = TRUE,
+                                  style = "bootstrap",
+                                  searchCols = lapply(r_state$dataviewer_search_columns, mknl),
+                                  columnDefs = list(
+                                    list(orderable = TRUE, targets = 0),
+                                    list(width = '15px', targets = 0),
+                                    list(width = '75px', targets = 1:(ncol(Ys_df)-1)),
+                                    list(className = "dt-center", targets = "_all")
+                                    #columnDefs = list(list(orderable = TRUE, targets = 0)
+                                  ),
+                                  search=list()
+                                ),
+                                filter=list(position = 'top', clear = FALSE))
+        dtable$x$data[[1]] <- as.numeric(dtable$x$data[[1]])-1
+        #Force name of column for sample ID to ID
+        colnames(dtable$x$data)[2] <- "ID"  #by default row number (0 based) on
+        # first column
+        Yvalues$dfWorking <- dtable
+       
+      }else
+      {#display warning
+        showModal(modalDialog(
+          title = "WARNING",
+          "Selected spectrum types do not match!"
+        ))
+      }
+      
+    })
+    
     # *********************************************************************
     
     
@@ -599,7 +662,7 @@ shinyServer(function(input, output, session) {
             #Remove rows in All_XData, .
             #Recompute PCAs and update PCAs, PCAsdt_dds and PCAsdt_dds_crit
             Yvalues$dfWorking$x$data <- Yvalues$dfWorking$x$data[-lesRows,]
-            Ys_df <<- Yvalues$dfWorking$x$data
+            Ys_df <<- Yvalues$dfWorking$x$data[,-1]
             for (k in 1:length(All_XData)){
                 All_XData[[k]] <<- All_XData[[k]][-(1+lesRows),]
             }
@@ -1336,6 +1399,7 @@ shinyServer(function(input, output, session) {
       dfsPCA <- as.data.frame(lePCA$x)
       dfsPCA <- cbind(dfsPCA,Ys_df[input$PCAPlotColorBy])
       nColor <- length(unique(dfsPCA[[input$PCAPlotColorBy]]))
+      suppressWarnings(colIndices <- (1:10 + rep(0,nColor))[1:nColor])
      
       
       switch(input$PCATopPlotType,
@@ -1345,9 +1409,9 @@ shinyServer(function(input, output, session) {
                                x=lepc1, y=lepc2,
                                type = "scatter", mode = "markers",
                                color=ptColor,
-                               colors = mycolors[1:nColor],
+                               colors = mycolors[colIndices],
                                size=8,
-                               text=as.character(Ys_df[[1]]),
+                               text=I(as.character(Ys_df[[1]])),
                                hovertemplate = paste('EchID: %{text}'),
                                )
              },
@@ -1404,9 +1468,9 @@ shinyServer(function(input, output, session) {
                              y=as.formula(" ~ Outside"),
                              type = "scatter", mode = "markers",
                              color=ptColor,
-                             colors = mycolors[1:nColor],
+                             colors = mycolors[colIndices],
                              size=8,
-                             text=as.character(Ys_df[[1]]),
+                             text=I(as.character(Ys_df[[1]])) ,
                              hovertemplate = paste('EchID: %{text}'),
                  ) %>%
                  layout(xaxis = list(title = list(text='In model distance (scores)',
@@ -1711,8 +1775,12 @@ shinyServer(function(input, output, session) {
       accsSD <- lapply(plsdaFit,function(p) p$results$AccuracySD)
       N <- length(accs[[1]])
       grp <- rep(unlist(nom_lesX),each=N)
+        
       if (input$AggregOpForPLSDA == "concatenate")
         grp <- rep(paste(nom_lesX,collapse=" + "),N*length(accs))
+      if (input$ResamplingForPLSDA=="LOOCV") 
+        accsSD <- rep(0,length(accsSD))
+      
       dfPl <- data.frame(GRP=as.factor(grp),
                          VLs=rep(1:N,times=length(accs)),
                          accs=unlist(accs),
@@ -1795,6 +1863,8 @@ shinyServer(function(input, output, session) {
           grp <- rep(unlist(nom_lesX),each=N)
           if (input$AggregOpForPLSDA == "concatenate")
             grp <- rep(paste(nom_lesX,collapse=" + "),N*length(accs))
+          if (input$ResamplingForPLSDA=="LOOCV") 
+            accsSD <- rep(0,length(accsSD))
           dfPl <- data.frame(GRP=as.factor(grp),
                         VLs=rep(1:N,times=length(accs)),
                         accs=unlist(accs),
