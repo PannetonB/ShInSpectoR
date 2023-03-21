@@ -309,7 +309,6 @@ shinyServer(function(input, output, session) {
         #make.unique to deal with repeated sample ID.
         Ys_df[,1] <<- as.factor(make.unique(as.character(Ys_df[,1])))
         Ys_df <<- cbind(Ys_df,data.frame(NoSeq=seq(1:nrow(Ys_df))))
-        Ys_df <- droplevels(Ys_df)
         #load all XData in All_XData
         indi <- which(!stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
         # indiDebug <<- indi
@@ -362,6 +361,9 @@ shinyServer(function(input, output, session) {
           ))
           return()
         }
+        
+        
+        Ys_df <- droplevels(Ys_df)
         
         #Flip All_XData to wavelength in increasing order!
         All_XData <<- lapply(All_XData, function(x){
