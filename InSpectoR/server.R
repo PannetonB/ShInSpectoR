@@ -688,7 +688,7 @@ shinyServer(function(input, output, session) {
       #Remove rows in All_XData, .
       #Recompute PCAs and update PCAs, PCAsdt_dds and PCAsdt_dds_crit
       Yvalues$dfWorking$x$data <- Yvalues$dfWorking$x$data[-lesRows,]
-      Ys_df <<- Yvalues$dfWorking$x$data
+      Ys_df <<- Yvalues$dfWorking$x$data[,-1]
       for (k in 1:length(All_XData)){
         All_XData[[k]] <<- All_XData[[k]][-(1+lesRows),]
       }
@@ -1522,13 +1522,27 @@ shinyServer(function(input, output, session) {
       fileinfo <- parseSavePath(volumes, input$PCAScoresSave)
       if (nrow(fileinfo) > 0) {
         isolate({
-          scores<-data.frame(ID=Ys_df[,1],lePCA$x[,1:input$NPCsforPCA])
+          scs <- lePCA$x[,1:input$NPCsforPCA]
+          eigVals <- lePCA$sdev[1:input$NPCsforPCA] 
+          midMat <- diag(1/eigVals^2)
+          mySD <- sqrt(diag(scs %*% midMat %*% t(scs)))
+          
+          x <- as.matrix(dat_4_PCA-matrix(lePCA$center,
+                                           nrow=nrow(dat_4_PCA),
+                                           ncol=ncol(dat_4_PCA),
+                                           byrow = T))
+          lds <- lePCA$rotation[,1:input$NPCsforPCA]
+          midMat <- diag(nrow=dim(x)[2]) - lds %*% t(lds)
+          myOD <- sqrt(diag(x %*% midMat %*% t(x)))
+          
+          scores<-data.frame(ID=Ys_df[,1],lePCA$x[,1:input$NPCsforPCA],
+                             SD=mySD, OD=myOD)
           # row.names(scores)=Ys_df[,1]  #Put sample IDs as row names.
           #Define column names
           shortNames <- lapply(strsplit(sort(input$XsforPCA),"_"), function(x) x[1])
           pre <- paste(unlist(shortNames),collapse="_")
           colonnes <- paste(pre,paste0("PC",1:input$NPCsforPCA),sep="_")
-          colnames(scores)[-1] <- colonnes
+          colnames(scores)[1+1:as.numeric(input$NPCsforPCA)] <- colonnes
           utils::write.table(scores,file=fileinfo$datapath,sep="\t",
                              row.names=FALSE)
         })
@@ -2184,6 +2198,7 @@ shinyServer(function(input, output, session) {
     observeEvent(input$applyModel,{
      
       switch(modelEnv$model_descript$type,
+             ### PCA ----
              PCA = {
                      #ID required spectrum types and make sur names in
                      #modelEnv matches names of spectrum types.
@@ -2355,7 +2370,9 @@ shinyServer(function(input, output, session) {
                           gridExtra::marrangeGrob(sp,ncol=N,nrow=N,top=NULL)
                         })
                       }
+                      lesPreds <<- cbind(lesPreds,data.frame(OD=myOD,SD=mySD))
                    },
+             ## PLS -----
              PLS = {
                    #ID required spectrum types and make sur names in
                    #modelEnv matches names of spectrum types.
@@ -2428,6 +2445,7 @@ shinyServer(function(input, output, session) {
                      
                    
                      },
+             ## PLSDA ----
              PLSDA = {
                        #ID required spectrum types and make sur names in
                        #modelEnv matches names of spectrum types.
