@@ -467,6 +467,7 @@ shinyServer(function(input, output, session) {
         updateSelectInput(session,"pc2",
                           choices = lesChoix,
                           selected="ODist")
+        proxy_Ys %>% selectRows(1L)
         proxy_Ys %>% selectRows(NULL)
     }, ignoreInit = T)
     
@@ -564,7 +565,10 @@ shinyServer(function(input, output, session) {
 
           
           #Force redraw
-          isolate(proxy_Ys %>% selectRows(NULL))
+          isolate({
+            proxy_Ys %>% selectRows(1L)
+            proxy_Ys %>% selectRows(NULL)
+            })
         })
     })
     
@@ -573,6 +577,7 @@ shinyServer(function(input, output, session) {
     
     ## Reacts to clearRows button ----
     observeEvent(input$clearRows, {
+        proxy_Ys %>% selectRows(1L)
         proxy_Ys %>% selectRows(NULL)
     })
     
@@ -674,7 +679,8 @@ shinyServer(function(input, output, session) {
               XData_p[[k]] <<- XData_p[[k]][-(1+lesRows),]
             }
             lesChoix <- computePCAonRaw(as.numeric(input$npcs),doRayleigh=FALSE)
-        }
+        } 
+        proxy_Ys %>% selectRows(1L)
         proxy_Ys %>% selectRows(NULL)
     })
     
@@ -697,6 +703,7 @@ shinyServer(function(input, output, session) {
         XData_p[[k]] <<- XData_p[[k]][-(1+lesRows),]
       }
       lesChoix <- computePCAonRaw(as.numeric(input$npcs),doRayleigh=FALSE)
+      proxy_Ys %>% selectRows(1L)
       proxy_Ys %>% selectRows(NULL)
     })
     # *********************************************************************
@@ -887,7 +894,12 @@ shinyServer(function(input, output, session) {
           leFichier <- fileinfo$datapath
           PP_params <- collectPreProParams(PPvaluesTrunc,input)
           PP_params <- stripPreProNames(PP_params)
-          save(PP_params,file=leFichier)
+          #For compatibility with InSpectoR and PolySpecteur, saves
+          #parameters in InSpectoR format. 
+          dum <- prepro_Shin_2_InSp(PP_params)
+          model_descript <- dum$model_descript
+          prepro_params <- dum$prepro_params
+          save(list=c('model_descript','prepro_params'),file=leFichier)
         })
       }
     })

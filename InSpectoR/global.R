@@ -134,6 +134,52 @@ collectPreProParams <- function(PPValuesTrunc,input){
 
 #***********************************************************************
 
+prepro_Shin_2_InSp <- function(PP_params)
+{
+  
+  
+  #Faire la liste model_descript
+  model_descript <- list()
+  model_descript$type <- "prepro"
+  model_descript$description <- "Créé par ShInSpectoR"
+  model_descript$datatype <- PP_params$lesNoms
+  NSpect <- length(PP_params$lesNoms)
+  
+  #Faire la liste prepro_params
+  prepro_params <- list()
+  trLims <- matrix(as.numeric(unlist(PP_params$trunc_limits[,1:2])),nrow=NSpect,ncol=2)
+  prepro_params$trunc_limits <- trLims
+  
+  scalIndx <- unlist(lapply(PP_params$perSpecParams, function(x) which(c("none", "waveband", "closure")==x[1])))
+  names(scalIndx) <- NULL
+  prepro_params$byspectra_scaling_index <- scalIndx
+  
+  c_n_w <- unlist(lapply(PP_params$perSpecParams, function(x) x[2]))
+  c_n_w <- c(c_n_w,unlist(lapply(PP_params$perSpecParams, function(x) x[3])))
+  c_n_w <- matrix(as.numeric(c_n_w),nrow=NSpect,ncol=2)
+  prepro_params$cntr_n_w <- c_n_w
+  
+  doSGol <- unlist(PP_params$savgolParams$doSavGol)
+  names(doSGol)<- NULL
+  prepro_params$do_savgol <- doSGol
+  
+  mSGol <- unlist(PP_params$savgolParams$m)
+  names(mSGol)<- NULL
+  prepro_params$m <- mSGol
+  
+  pSGol <- unlist(PP_params$savgolParams$p)
+  names(pSGol)<- NULL
+  prepro_params$p <- pSGol
+  
+  wSGol <- unlist(PP_params$savgolParams$w)
+  names(wSGol)<- NULL
+  prepro_params$w <- wSGol
+  
+  return(list(model_descript=model_descript,prepro_params=prepro_params))
+}
+
+#***********************************************************************
+
 Apply_PrePro <- function(preproParams)
   #Apply all preprocessing as defined in the prepro tab.
   #In preproParams, lesNoms give active spectrum types
