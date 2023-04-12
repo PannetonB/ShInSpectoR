@@ -83,7 +83,7 @@ buildPreProNames <- function(PP_params){
 #***********************************************************************
 
 collectPreProParams <- function(PPValuesTrunc,input){
-  
+  # cat("In collectPreProParams\n")
   #retrieve content of dfWorking data frame in PPValuesTrunc
   #truncParams is a data frame with spectrum type, lower limit and higher limit
   #in column 1 to 3 respectively
@@ -139,7 +139,7 @@ Apply_PrePro <- function(preproParams)
   #In preproParams, lesNoms give active spectrum types
 {
   #Truncation-----
- 
+  # cat("In Apply_Prepro\n")
   
   trunc_limits <- preproParams$trunc_limits
   lesNoms <- preproParams$lesNoms
@@ -245,7 +245,7 @@ computePCAonRaw <- function(nCP, doRayleigh=FALSE)
   # nCP: number of PC desired
   # doRayleigh : when TRUE, calculates Rayleigh cutoffs.
 {
-  
+  # cat("In computePCAonRaw\n")
   for (jj in 1:length(All_XData)){
     dats <- All_XData[[jj]]
     

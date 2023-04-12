@@ -2234,9 +2234,9 @@ shinyServer(function(input, output, session) {
                           }
                         }
                         y <- cbind(data.frame(ID=c("ID",Ys_df[[1]])),y)
-                        data_4_PCA <- y[-1,-1]
+                        dat_4_PCA <- y[-1,-1]
                         lesPreds <<- predict(modelEnv$lePCA,
-                                        newdata=data_4_PCA)[,1:modelEnv$NCPs]
+                                        newdata=dat_4_PCA)[,1:modelEnv$NCPs]
                         i1 <- as.integer(input$FirstPCApplyPCA)
                         i2 <- as.integer(input$LastPCApplyPCA)
                         N <- i2-i1+1
@@ -2332,9 +2332,9 @@ shinyServer(function(input, output, session) {
                         midMat <- diag(1/eigVals^2)
                         mySD <- sqrt(diag(scs %*% midMat %*% t(scs)))
                         
-                        x <- as.matrix(data_4_PCA-matrix(modelEnv$lePCA$center,
-                                                         nrow=nrow(data_4_PCA),
-                                                         ncol=ncol(data_4_PCA),
+                        x <- as.matrix(dat_4_PCA-matrix(modelEnv$lePCA$center,
+                                                         nrow=nrow(dat_4_PCA),
+                                                         ncol=ncol(dat_4_PCA),
                                                          byrow = T))
                         lds <- modelEnv$lePCA$rotation[,1:modelEnv$NCPs]
                         midMat <- diag(nrow=dim(x)[2]) - lds %*% t(lds)
@@ -2424,7 +2424,8 @@ shinyServer(function(input, output, session) {
                                        ncomp=modelEnv$pls_ncomp)
                      
                      lesPreds <<-data.frame(Prediction=plspreds)
-                     output$modelTable = renderDataTable(cbind(Ys_df[lesFacs],lesPreds),
+                     output$modelTable = renderDataTable(cbind(Ys_df[lesFacs],
+                                                               Prediction=lesPreds),
                                                          options=list(
                                                            autoWidth=FALSE,
                                                            dom = "<lf<\"datatables-scroll\"t>ipr>",
