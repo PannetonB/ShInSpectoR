@@ -134,6 +134,30 @@ collectPreProParams <- function(PPValuesTrunc,input){
 
 #***********************************************************************
 
+prepro_InSp_2_ShiInSp <- function(model_descript,prepro_params)  
+{
+  PP_params <- list()
+  PP_params$lesNoms <- model_descript$datatype
+  i <- 0
+  for (id in PP_params$lesNoms){
+    i <- i+1
+    PP_params$trunc_limits$lo <- prepro_params$trunc_limits[,1]
+    PP_params$trunc_limits$hi <- prepro_params$trunc_limits[,2]
+    PP_params$perSpecParams[[id]][1] <- 
+      c("none", "waveband", "closure")[prepro_params$byspectra_scaling_index[i]]
+    PP_params$perSpecParams[[id]][2] <- as.character(prepro_params$cntr_n_w[i,1])
+    PP_params$perSpecParams[[id]][3] <- as.character(prepro_params$cntr_n_w[i,2])
+    PP_params$savgolParams$doSavGol[[id]] <- prepro_params$do_savgol[i]
+    PP_params$savgolParams$w[[id]] <- prepro_params$w[i]
+    PP_params$savgolParams$p[[id]] <- prepro_params$p[i]
+    PP_params$savgolParams$m[[id]] <- prepro_params$m[i]
+  }
+  PP_params$trunc_limits <- data.frame(PP_params$trunc_limits)
+  return(PP_params)
+}
+
+#***********************************************************************
+
 prepro_Shin_2_InSp <- function(PP_params)
 {
   

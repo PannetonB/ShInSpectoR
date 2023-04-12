@@ -1086,7 +1086,7 @@ shinyServer(function(input, output, session) {
       XNames <- as.list(sort(input$XsForPLS))
       valid <- input$ResamplingForPLS
       
-      if (aggr=="Concatenate spectra"){
+      if (aggr=="concatenate spectra"){
         y <- data.frame(V1=Ys_df[[YName]])
         for (k in XNames){
           spdf<-as.data.frame(XData_p[[k]][-1,-1])
@@ -1166,7 +1166,10 @@ shinyServer(function(input, output, session) {
           pls_ncomp <- as.numeric(input$NbLVPLS_Sel)
           PP_params <- stripPreProNames(PP_params)
           colorby <- input$PLSPredPlotColorBy
-          save(model_descript,PP_params,plsFit,pls_ncomp,colorby,file=leFichier) 
+          #COnvert to InSpectoR format
+          dum <- prepro_Shin_2_InSp(PP_params)
+          prepro_params <- dum$prepro_params
+          save(model_descript,prepro_params,plsFit,pls_ncomp,colorby,file=leFichier) 
         })
       }
     })
@@ -2116,7 +2119,12 @@ shinyServer(function(input, output, session) {
           )
           pls_ncomp <- lapply(plsdaFit,function(x) x$bestTune$ncomp)
           PP_params <- stripPreProNames(PP_params)
-          save(model_descript,PP_params,plsdaFit,pls_ncomp,file=leFichier)
+          
+          #COnvert to InSpectoR format
+          dum <- prepro_Shin_2_InSp(PP_params)
+          prepro_params <- dum$prepro_params
+          
+          save(model_descript,prepro_params,plsdaFit,pls_ncomp,file=leFichier)
         })
       }
     })
@@ -2168,6 +2176,8 @@ shinyServer(function(input, output, session) {
         modelEnv <<- new.env()
         leFichier <- fileinfo$datapath
         load(file=leFichier, envir = modelEnv) 
+        #Convert Prepro params
+        modelEnv$PP_params <- prepro_InSp_2_ShiInSp(modelEnv$model_descript,modelEnv$prepro_params)
         output$modelType <- renderText(modelEnv$model_descript$type)
         output$modelDescOnApply <- renderText(modelEnv$model_descript$description)
         shortTypeMod <- getShortType(modelEnv$model_descript$datatype)

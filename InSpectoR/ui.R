@@ -340,8 +340,8 @@ shinyUI(fluidPage(
                                                                     selected=5),
                                                         hr(),
                                                         selectInput("AggregateForPLS","Aggregation method",
-                                                                   choices=c('Concatenate spectra'),
-                                                                   selected = 'Concatenate spectra')
+                                                                   choices=c('concatenate spectra'),
+                                                                   selected = 'concatenate spectra')
                                            ),
                                             mainPanel(width=0)
                                         ),
