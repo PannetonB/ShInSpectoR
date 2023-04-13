@@ -1577,6 +1577,7 @@ shinyServer(function(input, output, session) {
           nom_lesX <- sort(input$XsforPCA)
           shortNames <- sapply(strsplit(nom_lesX,'_'),"[[",1)
           model_descript=list(type="PCA",
+                              source="ShInSpectoR",
                               description=input$PCADescript,
                               datatype=shortNames)
           colorby<-Ys_df[,input$PCAPlotColorBy]
@@ -1605,7 +1606,12 @@ shinyServer(function(input, output, session) {
           }
           NCPs <- input$NPCsforPCA
           PP_params <- stripPreProNames(PP_params)
-          save(model_descript,PP_params,lePCA,NCPs,dds,colorby,
+          
+          #COnvert to InSpectoR format
+          dum <- prepro_Shin_2_InSp(PP_params)
+          prepro_params <- dum$prepro_params
+          
+          save(model_descript,prepro_params,lePCA,NCPs,dds,colorby,
                file=fileinfo$datapath)
         })
       }
