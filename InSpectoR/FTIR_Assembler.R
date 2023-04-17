@@ -1,4 +1,16 @@
 FTIR_Assembler <- function()
+#Reads all dpt files in a directory and assembles data in a single
+# X data files for ShInSpectoR. 
+# Also creates a Y data file with ID in first column and a dummy
+# factor in the second column. This dummy factor is simply FTIR.
+#
+# The user is prompted to select a directory and the resulting
+# files are stored in this directory. Two files are created:
+#   - FTIR_forShInSpectoR.txt which contains the spectra
+#   _ Y_forShInSpectoR.txt which is the required Y file.
+#
+#  
+  
 {
   lePath <- choose.dir()
   fichierOut <- file.path(lePath,"FTIR_forShInSpectoR.txt")
@@ -33,6 +45,6 @@ FTIR_Assembler <- function()
   }
   write.table(outData,file=fichierOut,row.names = F,col.names = F,sep="\t")
   Yfile <- file.path(lePath,"Y_forShInSpectoR.txt")
-  outData <- data.frame(ID=ID,Seq=1:length(lesFichiers))
+  outData <- data.frame(ID=ID,SpectrumType="FTIR",Seq=1:length(lesFichiers))
   write.table(outData,file=Yfile,row.names = F,col.names = T,sep="\t")
 }
