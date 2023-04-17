@@ -39,6 +39,7 @@ getShortType <- function(lestypes)
 {
   shortType <- strsplit(lestypes,"_")
   shortType <- sapply(shortType,"[[",1)
+  shortType <- sapply(strsplit(shortType,"w"),"[[",1)
   return(shortType)
 }
 
@@ -50,6 +51,9 @@ stripPreProNames <- function(PP_params){
   #Strip list item names so that only spectrum type ID is retained.
   #e.g. EX320_bbla_I.txt becomes EX320.
   shortNames <- sapply(strsplit(unlist(PP_params$lesNoms),"_"),"[[",1)
+  #To deal with names showing instrument name
+  shortNames <- sapply(strsplit(shortNames,"w"),"[[",1)
+  #e.g. EX320wHS2_bbla_I.txt becomes EX320.
   PP_out <- PP_params
   PP_out$lesNoms <- shortNames
   names(PP_out$perSpecParams) <- shortNames
@@ -68,6 +72,8 @@ buildPreProNames <- function(PP_params){
   sortedALLXDataList <- sort(ALLXDataList)
   longNames <- sortedALLXDataList
   shortNames <- sapply(strsplit(sortedALLXDataList,"_"),"[[",1)
+  #To deal with names showing instrument name
+  shortNames <- sapply(strsplit(shortNames,"w"),"[[",1)
   longNames <- sortedALLXDataList[shortNames %in% PP_params$lesNoms]
   PP_out <- PP_params
   PP_out$lesNoms <- longNames
@@ -432,11 +438,11 @@ Predict_plsda <- function(aggregOp,plsdaFit,mydata=NULL,probs=TRUE)
   }else  #only one model - no aggregation.
   {
     if (is.null(mydata)){
-      val_pred_cl <- predict(plsdaFit[[1]],newdata=plsdaFit[[1]]$trainingData[,-1]
+      val_pred_cl <- predict(plsdaFit[[1]]$finalModel,newdata=plsdaFit[[1]]$trainingData[,-1]
                              , type="prob")
     }else
     {
-      val_pred_cl <- predict(plsdaFit[[1]],newdata=mydata[[1]], type="prob")
+      val_pred_cl <- predict(plsdaFit[[1]]$finalModel,newdata=mydata[[1]][,-1], type="prob")
     }
     classes<-colnames(val_pred_cl)
     if (!probs)

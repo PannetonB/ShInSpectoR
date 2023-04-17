@@ -1157,6 +1157,8 @@ shinyServer(function(input, output, session) {
           }
           nom_lesX <- sort(input$XsForPLS)
           shortNames <- sapply(strsplit(nom_lesX,'_'),"[[",1)
+          #To deal with names showing instrument name
+          shortNames <- sapply(strsplit(shortNames,"w"),"[[",1)
           model_descript <- list(
             type = "PLS",
             description = input$PLSDescript,
@@ -1576,6 +1578,8 @@ shinyServer(function(input, output, session) {
         isolate({
           nom_lesX <- sort(input$XsforPCA)
           shortNames <- sapply(strsplit(nom_lesX,'_'),"[[",1)
+          #To deal with names showing instrument name
+          shortNames <- sapply(strsplit(shortNames,"w"),"[[",1)
           model_descript=list(type="PCA",
                               source="ShInSpectoR",
                               description=input$PCADescript,
@@ -1636,6 +1640,11 @@ shinyServer(function(input, output, session) {
           updateSelectInput(session,"PLSPredPlotColorBy",
                             choices = lesChoix[-1])
           updateSelectInput(session,input$ResamplingForPLSDA, selected = "cv")
+          
+          #Perform pre-processing so XData_p is inline with prepro options
+          #Useful in case user did not Apply prepros
+          preproParams <- collectPreProParams(PPvaluesTrunc,input)
+          Apply_PrePro(preproParams)
         })
       }
     
@@ -2117,6 +2126,8 @@ shinyServer(function(input, output, session) {
           }
           nom_lesX <- sort(input$XsForPLSDA)
           shortNames <- sapply(strsplit(nom_lesX,'_'),"[[",1)
+          #To deal with names showing instrument name
+          shortNames <- sapply(strsplit(shortNames,"w"),"[[",1)
           model_descript <- list(
             type = "PLSDA",
             description = input$PLSDADescript,
@@ -2129,7 +2140,9 @@ shinyServer(function(input, output, session) {
           #COnvert to InSpectoR format
           dum <- prepro_Shin_2_InSp(PP_params)
           prepro_params <- dum$prepro_params
-          
+          # Remove everything in plsdaFits except finalModel and trainingData
+          plsdaFit <- lapply(plsdaFit, function(f) 
+            f[names(plsdaFit[[1]]) %in% c("finalModel","trainingData")])
           save(model_descript,prepro_params,plsdaFit,pls_ncomp,file=leFichier)
         })
       }
@@ -2511,7 +2524,7 @@ shinyServer(function(input, output, session) {
                                y <- cbind(y,spdf)
                              }
                            }
-                           data_4_PLSDA <- list(y[-1,])
+                           data_4_PLSDA <- list(cbind(Ys_df[,1],y[-1,]))
                            y <- cbind(Ys_df[lesFacs],y[-1,])
                          }else
                          {
