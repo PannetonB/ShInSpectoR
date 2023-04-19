@@ -86,9 +86,9 @@ shinyUI(fluidPage(
                     sidebarLayout(
                         sidebarPanel(width=2,
                             fileInput("files", NULL,
-                                      buttonLabel = "Fichiers X et Y",
+                                      buttonLabel = "Fichier Y",
                                       accept = c(".txt"),
-                                      multiple=T),
+                                      multiple=F),
                             
                             h4("Y data file name: "),
                             textOutput("yFileName"),

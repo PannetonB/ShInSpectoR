@@ -1,27 +1,27 @@
 #
 #Server for ShInSpectoR
 
-#Increase upload limit to 30 Megs
+#Increase upload limit to 300 Megs
 
-options(shiny.maxRequestSize=30*1024^2) 
+options(shiny.maxRequestSize=300*1024^2) 
 
-#SET UP PROJECT PATH
-leFichier <- here("InSpectoR","www","defPath.RData")
-if (file.exists(leFichier)){
-  load(leFichier)
-  projectDir <<- utils::choose.dir(projectDir)
-  save(projectDir,file=leFichier)
-}else
-{
-  projectDir <<- utils::choose.dir(fs::path_home_r())
-  save(projectDir,file=leFichier)
-}
+
 
 
 shinyServer(function(input, output, session) {
- 
+  #SET UP PROJECT PATH
+  leFichier <- here("InSpectoR","www","defPath.RData")
+  if (file.exists(leFichier)){
+    load(leFichier)
+    projectDir <- utils::choose.dir(projectDir)
+    save(projectDir,file=leFichier)
+  }else
+  {
+    projectDir <- utils::choose.dir(fs::path_home_r())
+    save(projectDir,file=leFichier)
+  }
 
-    # To make modal window for loading plots draggable ----
+    # To make modal window for loading plots on Data tab draggable ----
     jqui_draggable('#modalExample')
   
     # *********************************************************************
@@ -103,12 +103,8 @@ shinyServer(function(input, output, session) {
             }
             indi <- which(stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
             if (length(indi)==0){
-              return("No valide Y file selected")
+              return("No valid Y file selected")
             }
-            indi2 <- which(!stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
-            if (length(indi2)==0) 
-              return('No spectra file selected')
-            inFile$name[indi]
         })
     
     # *********************************************************************
@@ -295,11 +291,32 @@ shinyServer(function(input, output, session) {
         k=1
         inFile <- input$files
         if (is.null(inFile))
-            return(NULL)
+          return(NULL)
+        
         indi <- which(stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
-        if (length(indi)==0) 
-          return('NULL')
-        indi <- which(!stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
+        if (length(indi)==0){
+            showModal(modalDialog(       #Not a Y file!
+              title="WARNING", 
+              paste("Must select a Y file!"),
+              icon=("alert - warning")
+            ))
+            return(NULL)
+        }
+        datasetID <- tools::file_path_sans_ext(inFile$name)
+        dum <- sub(".*_", "", datasetID) 
+        xFiles <- choose.files(default=paste0(projectDir,"\\*_",dum,".txt"))
+        dataTypes <- sub("w.*","",basename(xFiles))
+        if (any(duplicated(dataTypes))){
+          showModal(modalDialog(       #More than 1 file for each data type.
+            title="WARNING", 
+            paste("Duplicated data type not accepted. ABORT. 
+                  "),
+            icon=("alert - warning")
+          ))
+          return(NULL)
+        }
+        xFiles <<- xFiles
+        indi <- which(!stringr::str_detect(xFiles,glob2rx("Y_*.txt")))
         if (length(indi)==0) 
           return('NULL')
         #Load Y data
@@ -310,11 +327,12 @@ shinyServer(function(input, output, session) {
         Ys_df[,1] <<- as.factor(make.unique(as.character(Ys_df[,1])))
         Ys_df <<- cbind(Ys_df,data.frame(NoSeq=seq(1:nrow(Ys_df))))
         #load all XData in All_XData
-        indi <- which(!stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
+        indi <- 1:length(xFiles)
         # indiDebug <<- indi
         for (ii in 1:length(indi)){
             if (indi[ii]){
-                dum1<-read.table(file=inFile$datapath[ii],sep="\t", dec=".",header=FALSE)
+                # dum1<-read.table(file=inFile$datapath[ii],sep="\t", dec=".",header=FALSE)
+                dum1<-read.table(file=xFiles[ii],sep="\t", dec=".",header=FALSE)
                 dum1[-1,1] <- make.unique(as.character(dum1[-1,1]))
                 test1 <- length(dum1[-1,1])==length(Ys_df[,1])
                 test2 <- TRUE
@@ -330,7 +348,7 @@ shinyServer(function(input, output, session) {
                     
                 }else
                 {
-                  leNom <- tools::file_path_sans_ext(inFile$name[[ii]])  
+                  leNom <- tools::file_path_sans_ext(basename(xFiles[ii]))  
                   All_XData[[leNom]] <<- dum1
                 }
             }
@@ -376,12 +394,12 @@ shinyServer(function(input, output, session) {
         
         
         #files are loaded - remove extension from filenames
-        inFile$name<- tools::file_path_sans_ext((inFile$name))
+        xFiles<- tools::file_path_sans_ext((basename(xFiles)))
         
-        #Sets max nb of pcs to 15 or the number of samples-1 if smaller
+        #Sets max nb of pcs to 20 or the number of samples-1 if smaller
         nSamples <- nrow(All_XData[[1]])-1
         maxnCP <- ifelse (nSamples < 21, nSamples-1, 20 )
-        updateSelectInput(session,"npcs",choices=1:maxnCP,
+        updateSelectInput(session,"npcs",choices=2:maxnCP,
                           selected=2)
         
         lesChoix <- computePCAonRaw(as.numeric(input$npcs),
@@ -389,14 +407,14 @@ shinyServer(function(input, output, session) {
         
         #Populate Xs file selection and select first by default
         updateSelectInput(session, "Xs",               
-                          choices=inFile$name[indi],
-                          selected=inFile$name[indi][1])
-        ALLXDataList <<- inFile$name[indi]
+                          choices=xFiles,
+                          selected=xFiles[1])
+        ALLXDataList <<- xFiles
         
         #Populate PCA data selection
         updateSelectInput(session,"PCA_data",
-                          choices=inFile$name[indi],
-                          selected=inFile$name[indi][1])
+                          choices=xFiles,
+                          selected=xFiles[1])
         
         
         updateSelectInput(session,"pcaPtColorBy",
@@ -1090,7 +1108,8 @@ shinyServer(function(input, output, session) {
         y <- data.frame(V1=Ys_df[[YName]])
         for (k in XNames){
           spdf<-as.data.frame(XData_p[[k]][-1,-1])
-          pre <- strsplit(k,"_")[[1]][1]
+          pre <- getShortType(k)
+          # pre <- strsplit(k,"_")[[1]][1]
           colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
           y <- cbind(y,spdf)
         }
@@ -1156,9 +1175,8 @@ shinyServer(function(input, output, session) {
             })
           }
           nom_lesX <- sort(input$XsForPLS)
-          shortNames <- sapply(strsplit(nom_lesX,'_'),"[[",1)
-          #To deal with names showing instrument name
-          shortNames <- sapply(strsplit(shortNames,"w"),"[[",1)
+          shortNames <- getShortType(nom_lesX)
+         
           model_descript <- list(
             type = "PLS",
             description = input$PLSDescript,
@@ -1389,7 +1407,10 @@ shinyServer(function(input, output, session) {
           Apply_PrePro(preproParams)
           
           #Computes PCA on first spectrum in input$X to start with
-          doPCA(XData_p[[input$Xs[1]]])
+          dum <- XData_p[[input$Xs[1]]]
+          pre <- getShortType(input$Xs[1])
+          colnames(dum)[-1] <- paste(pre,as.character(dum[1,-1]),sep="_")
+          doPCA(dum)
           
           updateSelectInput(session, 'PCATopPlotType',
                               selected = 'Screeplot')
@@ -1511,7 +1532,7 @@ shinyServer(function(input, output, session) {
       y <- NULL
       for (k in input$XsforPCA){
         spdf<-as.data.frame(XData_p[[k]][,-1])
-        pre <- strsplit(k,"_")[[1]][1]
+        pre <- getShortType(k)
         colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
         if (is.null(y)){
           y <- spdf
@@ -1577,9 +1598,8 @@ shinyServer(function(input, output, session) {
       if (nrow(fileinfo) > 0){
         isolate({
           nom_lesX <- sort(input$XsforPCA)
-          shortNames <- sapply(strsplit(nom_lesX,'_'),"[[",1)
-          #To deal with names showing instrument name
-          shortNames <- sapply(strsplit(shortNames,"w"),"[[",1)
+         
+          shortNames <- getShortType(nom_lesX)
           model_descript=list(type="PCA",
                               source="ShInSpectoR",
                               description=input$PCADescript,
@@ -1694,6 +1714,9 @@ shinyServer(function(input, output, session) {
       plsda_inTrain <<- caret::createDataPartition(y=Ys_df[,input$YForPLSDA],
                                                    p=laprop, list=FALSE)
       
+      
+      
+      
       Ys <- data.frame(Cl1=Ys_df[,input$YForPLSDA])
       Xs <- sort(input$XsForPLSDA)
       
@@ -1701,7 +1724,7 @@ shinyServer(function(input, output, session) {
         #ATTN : do not work with XData_p but with the selected items.
         for (k in Xs){
           spdf<-as.data.frame(XData_p[[k]][-1,-1])
-          pre <- strsplit(k,"_")[[1]][1]
+          pre <- getShortType(k)
           colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
           Ys <- cbind(Ys,spdf)
         }
@@ -1709,8 +1732,10 @@ shinyServer(function(input, output, session) {
       }else
       {
         plsda_set <<- lapply(as.list(Xs), function(ii){
+          dum <- XData_p[[ii]]
+          pre <- getShortType(ii)
           y<-data.frame(Cl1=Ys ,XData_p[[ii]][-1,-1])
-          colnames(y)[-1]<-as.character(XData_p[[ii]][1,-1])
+          colnames(y)[-1]<-paste(pre,as.character(dum[1,-1]),sep="_")
           return(y)
         })
       }
@@ -2125,9 +2150,7 @@ shinyServer(function(input, output, session) {
             })
           }
           nom_lesX <- sort(input$XsForPLSDA)
-          shortNames <- sapply(strsplit(nom_lesX,'_'),"[[",1)
-          #To deal with names showing instrument name
-          shortNames <- sapply(strsplit(shortNames,"w"),"[[",1)
+          shortNames <- getShortType(nom_lesX)
           model_descript <- list(
             type = "PLSDA",
             description = input$PLSDADescript,
@@ -2142,7 +2165,7 @@ shinyServer(function(input, output, session) {
           prepro_params <- dum$prepro_params
           # Remove everything in plsdaFits except finalModel and trainingData
           plsdaFit <- lapply(plsdaFit, function(f) 
-            f[names(plsdaFit[[1]]) %in% c("finalModel","trainingData")])
+            f[names(f) %in% c("finalModel","trainingData")])
           save(model_descript,prepro_params,plsdaFit,pls_ncomp,file=leFichier)
         })
       }
@@ -2241,217 +2264,192 @@ shinyServer(function(input, output, session) {
       switch(modelEnv$model_descript$type,
              ### PCA ----
              PCA = {
-                     #ID required spectrum types and make sur names in
-                     #modelEnv matches names of spectrum types.
-                      shortTypeMod <- getShortType(modelEnv$model_descript$datatype)
-                      shortTypeLoaded <- getShortType(sort(ALLXDataList))
-                      lesTypes <- shortTypeMod %in% shortTypeLoaded 
-                      if (!all(lesTypes)){ #not good to go!
-                        showModal(modalDialog(
-                          title = "WARNING",
-                          "Selected spectrum types do not match!"
-                        ))
-                      }else
-                      {
+                      #Modify names
+                      locPP_params <- buildPreProNames(modelEnv$PP_params)
                       
-                        #Modify names
-                        locPP_params <- buildPreProNames(modelEnv$PP_params)
-                        
-                        #Do preprocessing
-                        Apply_PrePro(locPP_params)
-                        lesNoms <- names(XData_p)
-                        
-                        #Apply model
-                        y <- NULL
-                        for (k in lesNoms){
-                          spdf<-as.data.frame(XData_p[[k]][,-1])
-                          pre <- strsplit(k,"_")[[1]][1]
-                          colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
-                          if (is.null(y)){
-                            y <- spdf
-                          }else
-                          {
-                            y <- cbind(y,spdf)
-                          }
+                      #Do preprocessing
+                      Apply_PrePro(locPP_params)
+                      lesNoms <- names(XData_p)
+                      
+                      #Apply model
+                      y <- NULL
+                      for (k in lesNoms){
+                        spdf<-as.data.frame(XData_p[[k]][,-1])
+                        pre <- strsplit(k,"_")[[1]][1]
+                        pre <- strsplit(pre,"w")[[1]][1]
+                        colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
+                        if (is.null(y)){
+                          y <- spdf
+                        }else
+                        {
+                          y <- cbind(y,spdf)
                         }
-                        y <- cbind(data.frame(ID=c("ID",Ys_df[[1]])),y)
-                        dat_4_PCA <- y[-1,-1]
-                        lesPreds <<- predict(modelEnv$lePCA,
-                                        newdata=dat_4_PCA)[,1:modelEnv$NCPs]
-                        i1 <- as.integer(input$FirstPCApplyPCA)
-                        i2 <- as.integer(input$LastPCApplyPCA)
-                        N <- i2-i1+1
-                        
-                        #Plot scores
-                        shinyjs::show("modelPlot")
-                        data <- modelEnv$lePCA$x[,1:modelEnv$NCPs]
-                        dats <- rbind(data,lesPreds)[,i1:i2]
-                        colorCodes <-factor(c(as.character(modelEnv$colorby),rep("Pred.",nrow(lesPreds))),
-                                               levels <- c(as.character(unique(modelEnv$colorby)),
-                                                           "Pred."))
-                        #dats <- cbind(dats,as.data.frame(colorCodes))
-                        nCl <- length(unique(modelEnv$colorby))
-                        
-                        couleurs <- c(mesCouleurs[1:nCl],"#000000FF")
-                        
-                        # #My own plot
-                        # #First create plots and then arrange
-                        # #PC scatter plots
-                        
-                        sp <- list() #upper row - nothing yet
-                        for (i in 1:N^2){
-                          sp <- c(sp, list(
-                            ggplot2::ggplot() +
-                              ggplot2::theme_void() +
-                              ggplot2::geom_text(ggplot2::aes(0,0,label=' ')) +
-                              ggplot2::xlab(NULL)
-                            )
+                      }
+                      y <- cbind(data.frame(ID=c("ID",Ys_df[[1]])),y)
+                      dat_4_PCA <- y[-1,-1]
+                      lesPreds <<- predict(modelEnv$lePCA,
+                                      newdata=dat_4_PCA)[,1:modelEnv$NCPs]
+                      i1 <- as.integer(input$FirstPCApplyPCA)
+                      i2 <- as.integer(input$LastPCApplyPCA)
+                      N <- i2-i1+1
+                      
+                      #Plot scores
+                      shinyjs::show("modelPlot")
+                      data <- modelEnv$lePCA$x[,1:modelEnv$NCPs]
+                      dats <- rbind(data,lesPreds)[,i1:i2]
+                      colorCodes <-factor(c(as.character(modelEnv$colorby),rep("Pred.",nrow(lesPreds))),
+                                             levels <- c(as.character(unique(modelEnv$colorby)),
+                                                         "Pred."))
+                      #dats <- cbind(dats,as.data.frame(colorCodes))
+                      nCl <- length(unique(modelEnv$colorby))
+                      
+                      couleurs <- c(mesCouleurs[1:nCl],"#000000FF")
+                      
+                      # #My own plot
+                      # #First create plots and then arrange
+                      # #PC scatter plots
+                      
+                      sp <- list() #upper row - nothing yet
+                      for (i in 1:N^2){
+                        sp <- c(sp, list(
+                          ggplot2::ggplot() +
+                            ggplot2::theme_void() +
+                            ggplot2::geom_text(ggplot2::aes(0,0,label=' ')) +
+                            ggplot2::xlab(NULL)
                           )
-                        }
-                        #Set up legend
-                        if (N>2){
-                          kk=N^2-1
-                          df <- cbind(dats[,c(1,2)],as.data.frame(colorCodes),
-                                      row.names=NULL)
-                          nom1 <- names(df)[1]
-                          nom2 <- names(df)[2]
-                          sp[[kk]] <- ggplot2::ggplot(df, 
-                                                      ggplot2::aes(x = .data[[nom1]],
-                                                                   y = .data[[nom2]], 
-                                                                   color = colorCodes)) +
-                            ggplot2::geom_point() + 
-                            ggplot2::scale_color_manual(values=couleurs) +
-                            ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 6))) +
-                            theme(legend.title=element_text(size=20),
-                                  legend.text=element_text(size=14))
-                          leg <- ggpubr::get_legend(sp[[kk]])
-                          sp[[kk]] <- ggpubr::as_ggplot(leg)
-                        }
-                        
-                      
-                        # #Lower as PCs scatter
-                        for (i in (i1+1):i2){
-                          for (j in i1:(i-1)){
-                            kk <- (j-i1)*N+(i-i1+1)
-                            df <- cbind(dats[,c(j-i1+1,i-i1+1)],as.data.frame(colorCodes),
-                                       row.names=NULL)
-                             nom1 <- names(df)[1]
-                             nom2 <- names(df)[2]
-                             sp[[kk]] <- ggplot2::ggplot(df, 
-                                                         ggplot2::aes(x = .data[[nom1]],
-                                                              y = .data[[nom2]], 
-                                                              color = colorCodes)) +
-                               ggplot2::scale_color_manual(values=couleurs) +
-                                                ggplot2::geom_point(show.legend = FALSE) + 
-                               theme(axis.text = element_text(size = 14)) + 
-                               theme(axis.title = element_text(size = 18))
-                          }
-                        }
-                        # #Diag as densities
-                        pos <- c(1,5,9)
-                        for (i in i1:i2){
-                          df <- cbind(dats[,(i-i1+1)],as.data.frame(colorCodes),
-                                      row.names=NULL)
-                          nom1 <- names(df)[1]
-                          sp[[(i-i1)*N+(i-i1+1)]] <-
-                            ggplot2::ggplot(df, ggplot2::aes(x=.data[[nom1]],
-                                                             fill=colorCodes)) +
-                            ggplot2::geom_density(adjust=1.5, alpha=.6, show.legend=FALSE) +
-                            ggplot2::scale_fill_manual(values=couleurs) +
-                            ggplot2::labs(x=paste0("PC",i))+ 
-                            theme(axis.text = element_text(size = 14)) + 
-                            theme(axis.title = element_text(size = 18))
-                        }
-                        
-                        #OD-SD plot on top right
-                        kk=N*(N-1)+1
-                        #ODist vs SDist 
-                        #Calcul OD et SD pour l'échantillon
-                        #Voir manuel de PLS Toolbox de EigenVector dans Doc du projet
-                        scs <- lesPreds
-                        eigVals <- modelEnv$lePCA$sdev[1:modelEnv$NCPs] 
-                        midMat <- diag(1/eigVals^2)
-                        mySD <- sqrt(diag(scs %*% midMat %*% t(scs)))
-                        
-                        x <- as.matrix(dat_4_PCA-matrix(modelEnv$lePCA$center,
-                                                         nrow=nrow(dat_4_PCA),
-                                                         ncol=ncol(dat_4_PCA),
-                                                         byrow = T))
-                        lds <- modelEnv$lePCA$rotation[,1:modelEnv$NCPs]
-                        midMat <- diag(nrow=dim(x)[2]) - lds %*% t(lds)
-                        myOD <- sqrt(diag(x %*% midMat %*% t(x)))
-                        
-                        
-                        df <- data.frame(SD=c(modelEnv$dds$SDist, mySD),
-                                         OD=c(modelEnv$dds$ODist, myOD),
-                                         colorCodes = colorCodes)
+                        )
+                      }
+                      #Set up legend
+                      if (N>2){
+                        kk=N^2-1
+                        df <- cbind(dats[,c(1,2)],as.data.frame(colorCodes),
+                                    row.names=NULL)
                         nom1 <- names(df)[1]
                         nom2 <- names(df)[2]
                         sp[[kk]] <- ggplot2::ggplot(df, 
                                                     ggplot2::aes(x = .data[[nom1]],
                                                                  y = .data[[nom2]], 
-                                                                 color = colorCodes)) 
-                        if (N==2){
-                          sp[[kk]] <- sp[[kk]] +  ggplot2::geom_point(show.legend = TRUE) +
-                            theme(legend.title=element_text(size=20),
-                                  legend.text=element_text(size=14))
-                        }else
-                        {
-                          sp[[kk]] <- sp[[kk]] +  ggplot2::geom_point(show.legend = FALSE)
-                        }
-                        sp[[kk]] <- sp[[kk]] +
+                                                                 color = colorCodes)) +
+                          ggplot2::geom_point() + 
                           ggplot2::scale_color_manual(values=couleurs) +
-                          ggplot2::labs(x="Score distance",
-                                        y="Outside distance")+ 
+                          ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 6))) +
+                          theme(legend.title=element_text(size=20),
+                                legend.text=element_text(size=14))
+                        leg <- ggpubr::get_legend(sp[[kk]])
+                        sp[[kk]] <- ggpubr::as_ggplot(leg)
+                      }
+                      
+                    
+                      # #Lower as PCs scatter
+                      for (i in (i1+1):i2){
+                        for (j in i1:(i-1)){
+                          kk <- (j-i1)*N+(i-i1+1)
+                          df <- cbind(dats[,c(j-i1+1,i-i1+1)],as.data.frame(colorCodes),
+                                     row.names=NULL)
+                           nom1 <- names(df)[1]
+                           nom2 <- names(df)[2]
+                           sp[[kk]] <- ggplot2::ggplot(df, 
+                                                       ggplot2::aes(x = .data[[nom1]],
+                                                            y = .data[[nom2]], 
+                                                            color = colorCodes)) +
+                             ggplot2::scale_color_manual(values=couleurs) +
+                                              ggplot2::geom_point(show.legend = FALSE) + 
+                             theme(axis.text = element_text(size = 14)) + 
+                             theme(axis.title = element_text(size = 18))
+                        }
+                      }
+                      # #Diag as densities
+                      pos <- c(1,5,9)
+                      for (i in i1:i2){
+                        df <- cbind(dats[,(i-i1+1)],as.data.frame(colorCodes),
+                                    row.names=NULL)
+                        nom1 <- names(df)[1]
+                        sp[[(i-i1)*N+(i-i1+1)]] <-
+                          ggplot2::ggplot(df, ggplot2::aes(x=.data[[nom1]],
+                                                           fill=colorCodes)) +
+                          ggplot2::geom_density(adjust=1.5, alpha=.6, show.legend=FALSE) +
+                          ggplot2::scale_fill_manual(values=couleurs) +
+                          ggplot2::labs(x=paste0("PC",i))+ 
                           theme(axis.text = element_text(size = 14)) + 
                           theme(axis.title = element_text(size = 18))
-                        
-                        
-                        output$modelPlot <- renderPlot({
-                          gridExtra::marrangeGrob(sp,ncol=N,nrow=N,top=NULL)
-                        })
                       }
+                      
+                      #OD-SD plot on top right
+                      kk=N*(N-1)+1
+                      #ODist vs SDist 
+                      #Calcul OD et SD pour l'échantillon
+                      #Voir manuel de PLS Toolbox de EigenVector dans Doc du projet
+                      scs <- lesPreds
+                      eigVals <- modelEnv$lePCA$sdev[1:modelEnv$NCPs] 
+                      midMat <- diag(1/eigVals^2)
+                      mySD <- sqrt(diag(scs %*% midMat %*% t(scs)))
+                      
+                      x <- as.matrix(dat_4_PCA-matrix(modelEnv$lePCA$center,
+                                                       nrow=nrow(dat_4_PCA),
+                                                       ncol=ncol(dat_4_PCA),
+                                                       byrow = T))
+                      lds <- modelEnv$lePCA$rotation[,1:modelEnv$NCPs]
+                      midMat <- diag(nrow=dim(x)[2]) - lds %*% t(lds)
+                      myOD <- sqrt(diag(x %*% midMat %*% t(x)))
+                      
+                      
+                      df <- data.frame(SD=c(modelEnv$dds$SDist, mySD),
+                                       OD=c(modelEnv$dds$ODist, myOD),
+                                       colorCodes = colorCodes)
+                      nom1 <- names(df)[1]
+                      nom2 <- names(df)[2]
+                      sp[[kk]] <- ggplot2::ggplot(df, 
+                                                  ggplot2::aes(x = .data[[nom1]],
+                                                               y = .data[[nom2]], 
+                                                               color = colorCodes)) 
+                      if (N==2){
+                        sp[[kk]] <- sp[[kk]] +  ggplot2::geom_point(show.legend = TRUE) +
+                          theme(legend.title=element_text(size=20),
+                                legend.text=element_text(size=14))
+                      }else
+                      {
+                        sp[[kk]] <- sp[[kk]] +  ggplot2::geom_point(show.legend = FALSE)
+                      }
+                      sp[[kk]] <- sp[[kk]] +
+                        ggplot2::scale_color_manual(values=couleurs) +
+                        ggplot2::labs(x="Score distance",
+                                      y="Outside distance")+ 
+                        theme(axis.text = element_text(size = 14)) + 
+                        theme(axis.title = element_text(size = 18))
+                      
+                      
+                      output$modelPlot <- renderPlot({
+                        gridExtra::marrangeGrob(sp,ncol=N,nrow=N,top=NULL)
+                      })
                       lesPreds <<- cbind(lesPreds,data.frame(OD=myOD,SD=mySD))
                    },
              ## PLS -----
              PLS = {
-                   #ID required spectrum types and make sur names in
-                   #modelEnv matches names of spectrum types.
-                   shortTypeMod <- getShortType(modelEnv$model_descript$datatype)
-                   shortTypeLoaded <- getShortType(sort(ALLXDataList))
-                   lesTypes <- shortTypeMod %in% shortTypeLoaded 
-                   if (!all(lesTypes)){ #not good to go!
-                     showModal(modalDialog(
-                       title = "WARNING",
-                       "Selected spectrum types do not match!"
-                     ))
-                   }else
-                   {
-                     
-                     #Modify names
-                     locPP_params <- buildPreProNames(modelEnv$PP_params)
-                     
-                     #Do preprocessing
-                     Apply_PrePro(locPP_params)
-                     lesNoms <- names(XData_p)
-                     lesFacs <- input$factorsToShow
-                     y <- NULL
-                     
-                     #Apply model
-                     for (k in lesNoms){
-                         spdf<-as.data.frame(XData_p[[k]][,-1])
-                         pre <- strsplit(k,"_")[[1]][1]
-                         colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
-                         if (is.null(y)){
-                           y <- spdf
-                         }else
-                         {
-                           y <- cbind(y,spdf)
-                         }
+                   #Modify names
+                   locPP_params <- buildPreProNames(modelEnv$PP_params)
+                   
+                   #Do preprocessing
+                   Apply_PrePro(locPP_params)
+                   lesNoms <- names(XData_p)
+                   lesFacs <- input$factorsToShow
+                   y <- NULL
+                   
+                   #Apply model
+                   for (k in lesNoms){
+                       spdf<-as.data.frame(XData_p[[k]][,-1])
+                       pre <- strsplit(k,"_")[[1]][1]
+                       pre <- strsplit(pre,"w")[[1]][1]
+                       colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
+                       if (is.null(y)){
+                         y <- spdf
+                       }else
+                       {
+                         y <- cbind(y,spdf)
                        }
-                       data_4_PLSDA <- list(y[-1,])
-                       y <- cbind(Ys_df[lesFacs],y[-1,])
                      }
+                     data_4_PLSDA <- list(y[-1,])
+                     y <- cbind(Ys_df[lesFacs],y[-1,])
+                    
                      
                      
                      shinyjs::hide("modelPlot")
@@ -2489,92 +2487,79 @@ shinyServer(function(input, output, session) {
                      },
              ## PLSDA ----
              PLSDA = {
-                       #ID required spectrum types and make sur names in
-                       #modelEnv matches names of spectrum types.
-                       shortTypeMod <- getShortType(modelEnv$model_descript$datatype)
-                       shortTypeLoaded <- getShortType(sort(ALLXDataList))
-                       lesTypes <- shortTypeMod %in% shortTypeLoaded 
-                       if (!all(lesTypes)){ #not good to go!
-                         showModal(modalDialog(
-                           title = "WARNING",
-                           "Selected spectrum types do not match!"
-                         ))
+                       #Modify names
+                       locPP_params <- buildPreProNames(modelEnv$PP_params)
+                       
+                       #Do preprocessing
+                       Apply_PrePro(locPP_params)
+                       lesNoms <- names(XData_p)
+                       lesFacs <- input$factorsToShow
+                       y <- NULL
+                       
+                       #Apply model
+                       if (modelEnv$model_descript$aggregation=="concatenate"){
+                         for (k in lesNoms){
+                           spdf<-as.data.frame(XData_p[[k]][,-1])
+                           pre <- strsplit(k,"_")[[1]][1]
+                           pre <- strsplit(pre,"w")[[1]][1]
+                           colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
+                           if (is.null(y)){
+                             y <- spdf
+                           }else
+                           {
+                             y <- cbind(y,spdf)
+                           }
+                         }
+                         data_4_PLSDA <- list(cbind(Ys_df[,1],y[-1,]))
+                         y <- cbind(Ys_df[lesFacs],y[-1,])
                        }else
                        {
                          
-                         #Modify names
-                         locPP_params <- buildPreProNames(modelEnv$PP_params)
-                         
-                         #Do preprocessing
-                         Apply_PrePro(locPP_params)
-                         lesNoms <- names(XData_p)
-                         lesFacs <- input$factorsToShow
-                         y <- NULL
-                         
-                         #Apply model
-                         if (modelEnv$model_descript$aggregation=="concatenate"){
-                           for (k in lesNoms){
-                             spdf<-as.data.frame(XData_p[[k]][,-1])
-                             pre <- strsplit(k,"_")[[1]][1]
-                             colnames(spdf)<-paste(pre,as.character(XData_p[[k]][1,-1]),sep="_")
-                             if (is.null(y)){
-                               y <- spdf
-                             }else
-                             {
-                               y <- cbind(y,spdf)
-                             }
-                           }
-                           data_4_PLSDA <- list(cbind(Ys_df[,1],y[-1,]))
-                           y <- cbind(Ys_df[lesFacs],y[-1,])
-                         }else
-                         {
-                           
-                           nameList <- as.list(lesNoms)
-                           data_4_PLSDA <- lapply(nameList, function(ii){
-                             y<-data.frame(Ys_df[,1],XData_p[[ii]][-1,-1])
-                              colnames(y)<-as.character(XData_p[[ii]][1,])
-                             return(y)
-                           })
-                         }
-                         
-                         
-                         shinyjs::hide("modelPlot")
-                         
-                         shinyjs::show("modelTable")
-                         
-                         plsda_probs <- Predict_plsda(modelEnv$model_descript$aggregation,
-                                                      modelEnv$plsdaFit,
-                                                      mydata=data_4_PLSDA,probs=TRUE)
-                         plsda_cl <- Predict_plsda(modelEnv$model_descript$aggregation,
-                                                   modelEnv$plsdaFit,
-                                                   mydata=data_4_PLSDA,probs=FALSE)
-                         
-                         plsda_probs<-round(plsda_probs,2)
-                         lesdiffs<-t(apply(plsda_probs,1,sort,decreasing=TRUE))
-                         lesdiffs<-lesdiffs[,1]-lesdiffs[,2]
-                         lesPreds <<-data.frame(
-                                        Pred_Cl=plsda_cl,
-                                        Pred_prob = plsda_probs,
-                                        minDiff=lesdiffs)
-                         output$modelTable = renderDataTable(cbind(Ys_df[lesFacs],lesPreds),
-                                                             options=list(
-                                                               autoWidth=FALSE,
-                                                               dom = "<lf<\"datatables-scroll\"t>ipr>",
-                                                               rownames = FALSE,
-                                                               class="compact",
-                                                               lengthMenu = list(c(10, 15, 20, -1), c('10', '15', '20','All')),
-                                                               pageLength = 10,
-                                                               # scrollX = TRUE,
-                                                               style = "bootstrap",
-                                                               columnDefs = list(
-                                                                 list(orderable = TRUE, targets = 0),
-                                                                 list(width = '20px', targets = 0),
-                                                                 list(className = "dt-center", targets = "_all")
-                                                                 #columnDefs = list(list(orderable = TRUE, targets = 0)
-                                                               )
-                                                             ),filter='top')
-               
+                         nameList <- as.list(lesNoms)
+                         data_4_PLSDA <- lapply(nameList, function(ii){
+                           y<-data.frame(Ys_df[,1],XData_p[[ii]][-1,-1])
+                            colnames(y)<-as.character(XData_p[[ii]][1,])
+                           return(y)
+                         })
                        }
+                       
+                       
+                       shinyjs::hide("modelPlot")
+                       
+                       shinyjs::show("modelTable")
+                       
+                       plsda_probs <- Predict_plsda(modelEnv$model_descript$aggregation,
+                                                    modelEnv$plsdaFit,
+                                                    mydata=data_4_PLSDA,probs=TRUE)
+                       plsda_cl <- Predict_plsda(modelEnv$model_descript$aggregation,
+                                                 modelEnv$plsdaFit,
+                                                 mydata=data_4_PLSDA,probs=FALSE)
+                       
+                       plsda_probs<-round(plsda_probs,2)
+                       lesdiffs<-t(apply(plsda_probs,1,sort,decreasing=TRUE))
+                       lesdiffs<-lesdiffs[,1]-lesdiffs[,2]
+                       lesPreds <<-data.frame(
+                                      Pred_Cl=plsda_cl,
+                                      Pred_prob = plsda_probs,
+                                      minDiff=lesdiffs)
+                       output$modelTable = renderDataTable(cbind(Ys_df[lesFacs],lesPreds),
+                                                           options=list(
+                                                             autoWidth=FALSE,
+                                                             dom = "<lf<\"datatables-scroll\"t>ipr>",
+                                                             rownames = FALSE,
+                                                             class="compact",
+                                                             lengthMenu = list(c(10, 15, 20, -1), c('10', '15', '20','All')),
+                                                             pageLength = 10,
+                                                             # scrollX = TRUE,
+                                                             style = "bootstrap",
+                                                             columnDefs = list(
+                                                               list(orderable = TRUE, targets = 0),
+                                                               list(width = '20px', targets = 0),
+                                                               list(className = "dt-center", targets = "_all")
+                                                               #columnDefs = list(list(orderable = TRUE, targets = 0)
+                                                             )
+                                                           ),filter='top')
+               
                     }
              )
       shinyjs::show("saveModelResults")
