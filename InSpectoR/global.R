@@ -15,6 +15,7 @@ RayleighCutoffs <<- list() #where to cut to eliminate Rayleigh in fluorescence
                            #one element per element in All_XData with same names.
 whichPLSPlot <<- "none"
 whichPLSDAPlot <<- "none"
+xFiles <<- "none"
 
 ## In Shiny app ----
 
