@@ -9,17 +9,15 @@ options(shiny.maxRequestSize=300*1024^2)
 
 
 shinyServer(function(input, output, session) {
+  
+  session$onSessionEnded(function(){
+      stopApp()
+  })
+
+  
   #SET UP PROJECT PATH
   leFichier <- here("InSpectoR","www","defPath.RData")
-  if (file.exists(leFichier)){
-    load(leFichier)
-    projectDir <- utils::choose.dir(projectDir)
-    save(projectDir,file=leFichier)
-  }else
-  {
-    projectDir <- utils::choose.dir(fs::path_home_r())
-    save(projectDir,file=leFichier)
-  }
+  load(leFichier)
 
     # To make modal window for loading plots on Data tab draggable ----
     jqui_draggable('#modalExample')
