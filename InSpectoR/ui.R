@@ -125,6 +125,7 @@ shinyUI(fluidPage(
                                    actionButton("selectAll","Select all shown"),
                                    actionButton("deleteAll", "Delete all shown"),
                                    actionButton("flipSelection","Set selection complement"),
+                                   actionButton("saveEdited","Save edited data"),
                                    hr(style = "border-top: 1px solid #FFFFFF;"),
                                    fluidRow(DT::dataTableOutput('Ys',
                                                                 height='auto',

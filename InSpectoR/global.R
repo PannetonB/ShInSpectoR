@@ -16,6 +16,7 @@ RayleighCutoffs <<- list() #where to cut to eliminate Rayleigh in fluorescence
 whichPLSPlot <<- "none"
 whichPLSDAPlot <<- "none"
 xFiles <<- "none"
+dataDir <<- ""
 
 ## In Shiny app ----
 

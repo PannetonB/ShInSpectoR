@@ -313,7 +313,8 @@ shinyServer(function(input, output, session) {
           ))
           return(NULL)
         }
-        xFiles <<- xFiles
+        # xFiles <<- xFiles
+        dataDir <<- dirname(xFiles[1])
         indi <- which(!stringr::str_detect(xFiles,glob2rx("Y_*.txt")))
         if (length(indi)==0) 
           return('NULL')
@@ -392,7 +393,7 @@ shinyServer(function(input, output, session) {
         
         
         #files are loaded - remove extension from filenames
-        xFiles<- tools::file_path_sans_ext((basename(xFiles)))
+        xFiles<- tools::file_path_sans_ext((basename(xFiles[indi])))
         
         #Sets max nb of pcs to 20 or the number of samples-1 if smaller
         nSamples <- nrow(All_XData[[1]])-1
@@ -721,6 +722,40 @@ shinyServer(function(input, output, session) {
       lesChoix <- computePCAonRaw(as.numeric(input$npcs),doRayleigh=FALSE)
       proxy_Ys %>% selectRows(1L)
       proxy_Ys %>% selectRows(NULL)
+    })
+    # *********************************************************************
+    
+    
+    ## Reacts to saveEdited button ----
+    observeEvent(input$saveEdited, {
+      #See if there is a "Edited00" directory in the X files directory
+      lesDirs <- list.dirs(paste0(dataDir))
+      if (length(lesDirs)>1){
+        lesEdited <- grep("Edited",lesDirs)
+        lesEdited <- lesDirs[lesEdited]
+        lastOne <- max(as.numeric(sub(".*Edited","",lesEdited)))
+        newDir <- paste0("Edited",sprintf("%02d", (lastOne+1)))
+        newDir <- file.path(dataDir,newDir)
+      }else
+      {
+        newDir <- file.path(dataDir,"Edited00")
+      }
+      dir.create(newDir)
+      
+      #Write Y file
+      yFile <- file.path(newDir,input$files$name)
+      write.table(Ys_df,file=yFile,col.names = T, row.names = F,
+                  sep="\t",dec=".")
+      
+      #Write X files
+      for (unFichier in ALLXDataList){
+        xFile <- file.path(newDir,paste0(unFichier,".txt"))
+        dats <- All_XData[[unFichier]]
+        write.table(dats, file=xFile,
+                    row.names = F, col.names = F,
+                    sep="\t", dec=".")
+      }
+      
     })
     # *********************************************************************
     
