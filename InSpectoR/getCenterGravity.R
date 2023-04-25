@@ -1,7 +1,7 @@
 getCenterGravity <- function(plage=c(610:710),seuil=0.1)
   #*****************************************************************************
   # Calcul du centre de gravité sur un portion d'un spectre.
-  # La portion du spectre est définie par le paramètre place. La valeur par
+  # La portion du spectre est définie par le paramètre plage. La valeur par
   # défaut est de 610 à 710 en unités de l'axe des x (longueur d'onde ou nombre
   # d'onde selon le cas).
   #
