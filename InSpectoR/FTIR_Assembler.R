@@ -21,7 +21,7 @@ FTIR_Assembler <- function()
   newOutFile <- TRUE
   ID <- character()
   for (unFichier in lesFichiers){
-    echID <-  sub("_.*","",unFichier)
+    echID <-  sub("[.].*","",unFichier) #Keep all left to first dot
     ID <- c(ID,echID)
     dats <- read.delim(file.path(lePath,unFichier), header=FALSE)
     #Reverse elements as wn are in decreasing order
