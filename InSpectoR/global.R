@@ -354,8 +354,8 @@ computePCAonRaw <- function(nCP, doRayleigh=FALSE)
         #Find average location of dip for all samples.
         wvDip <- round(quantile(wvDips,probs=0.9,na.rm=T))
         #If wvDip too close to EXwv, default do EXwv + 25
-        if (wvDip<(EXwv+10)) wvDip <- EXwv+25
-        if (wvDip>(EXwv+25)) wvDip <- EXwv+25
+        if (wvDip<(EXwv+10) | is.na(wvDip)) wvDip <- EXwv+25
+        if (wvDip>(EXwv+25) | is.na(wvDip)) wvDip <- EXwv+25
         
         #Store to RayleighCutoffs
         RayleighCutoffs[[leNom]] <<- wvDip
