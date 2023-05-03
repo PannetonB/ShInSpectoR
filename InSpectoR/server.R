@@ -302,7 +302,7 @@ shinyServer(function(input, output, session) {
         }
         datasetID <- tools::file_path_sans_ext(inFile$name)
         dum <- sub(".*_", "", datasetID) 
-        xFiles <- choose.files(default=paste0(projectDir,"\\*_",dum,".txt"))
+        xFiles <- choose.files(default=paste0(projectDir,"\\*_",dum,"*.txt"))
         dataTypes <- sub("w.*","",basename(xFiles))
         if (any(duplicated(dataTypes))){
           showModal(modalDialog(       #More than 1 file for each data type.
