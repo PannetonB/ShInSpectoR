@@ -732,8 +732,13 @@ shinyServer(function(input, output, session) {
       lesDirs <- list.dirs(paste0(dataDir))
       if (length(lesDirs)>1){
         lesEdited <- grep("Edited",lesDirs)
-        lesEdited <- lesDirs[lesEdited]
-        lastOne <- max(as.numeric(sub(".*Edited","",lesEdited)))
+        if (length(lesEdited)==0){
+          lastOne <- 0
+        }else
+        {
+          lesEdited <- lesDirs[lesEdited]
+          lastOne <- max(as.numeric(sub(".*Edited","",lesEdited)))
+        }
         newDir <- paste0("Edited",sprintf("%02d", (lastOne+1)))
         newDir <- file.path(dataDir,newDir)
       }else
