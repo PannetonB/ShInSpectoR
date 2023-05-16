@@ -32,10 +32,18 @@ getCenterGravity <- function(plage=c(610:710),seuil=0.1)
   
   leFichier <- choose.files(caption="Choose a spectral data file",multi=F)
   
+  
+  RayleighCutoff <- as.numeric(winDialogString("Longueur d'onde pour éliminer le Rayleigh","300"))
+  
   dats <- read.delim(leFichier, header=FALSE)
   wl <- as.numeric(dats[1,-1])
+  i1 <- which(wl>=RayleighCutoff)[1]
+  dats[-1,c(2:i1)] <- 0
+  dats <- normLigne(dats)
   ID <- dats[-1,1]
   sp <-dats[-1,-1]
+  sp <- as.matrix(sp)
+  
   
   yFichier <- choose.files(caption="Choose Y files or cancel for automatic creation",
                            multi = FALSE,
@@ -70,15 +78,16 @@ getCenterGravity <- function(plage=c(610:710),seuil=0.1)
   
   #Calcul du centre de gravité
   indi <-  which(wl %in% plage)
-  indSeuil <- which(wl==wvSeuil)
   cgs <- apply(sp,1,FUN=function(s){
     cg <- sum(s[indi]*wl[indi])/sum(s[indi])
     #Test peak amplitude in range
-    if (mean(s[indi]<seuil)) cg <- NA
+    if (mean(s[indi])<seuil){
+      cg <- NA
+    }
     round(cg,2)
   })
   
-  Ys_df <- cbind(Ys_df,data.frame(Ctr_Grav=cgs))
+  Ys_df <- cbind(Ys_df,data.frame(CtrGrav=as.numeric(cgs)))
   write.table(Ys_df,file=yFichier,sep="\t",row.names = FALSE)
 
   

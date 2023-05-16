@@ -321,7 +321,7 @@ shinyServer(function(input, output, session) {
         #Load Y data
         indi <- which(stringr::str_detect(inFile$name,glob2rx("Y_*.txt")))
         Ys_df <<- read.table(file=inFile$datapath[indi],header=TRUE,sep="\t",dec=".",
-                             na.strings = "", stringsAsFactors = T)
+                             na.strings = c("","NA"), stringsAsFactors = T)
         #make.unique to deal with repeated sample ID.
         Ys_df[,1] <<- as.factor(make.unique(as.character(Ys_df[,1])))
         Ys_df <<- cbind(Ys_df,data.frame(NoSeq=seq(1:nrow(Ys_df))))
@@ -442,7 +442,7 @@ shinyServer(function(input, output, session) {
                                     # scrollX = TRUE,
                                     style = "bootstrap",
                                     columnDefs = list(
-                                      list(orderable = TRUE, targets = 0),
+                                      list(orderable = TRUE, targets = "_all"),
                                       list(width = '15px', targets = 0),
                                       list(width = '100px', targets = 1:(ncol(Ys_df)-1)),
                                       list(className = "dt-center", targets = "_all")
