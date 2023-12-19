@@ -16,8 +16,12 @@ shinyServer(function(input, output, session) {
 
   
   #SET UP PROJECT PATH
-  leFichier <- here("InSpectoR","www","defPath.RData")
-  load(leFichier)
+  projectDir <- rstudioapi::selectDirectory(
+    caption="Select root working directory for this session.",
+
+  )
+  # leFichier <- here("InSpectoR","www","defPath.RData")
+  # load(leFichier)
 
     # To make modal window for loading plots on Data tab draggable ----
     jqui_draggable('#modalExample')
@@ -687,6 +691,7 @@ shinyServer(function(input, output, session) {
             #Remove rows in All_XData, .
             #Recompute PCAs and update PCAs, PCAsdt_dds and PCAsdt_dds_crit
             Yvalues$dfWorking$x$data <- Yvalues$dfWorking$x$data[-lesRows,]
+            Yvalues$dfWorking$x$data <- droplevels(Yvalues$dfWorking$x$data)
             Ys_df <<- Yvalues$dfWorking$x$data[,-1]
             for (k in 1:length(All_XData)){
                 All_XData[[k]] <<- All_XData[[k]][-(1+lesRows),]
@@ -711,6 +716,7 @@ shinyServer(function(input, output, session) {
       #Remove rows in All_XData, .
       #Recompute PCAs and update PCAs, PCAsdt_dds and PCAsdt_dds_crit
       Yvalues$dfWorking$x$data <- Yvalues$dfWorking$x$data[-lesRows,]
+      Yvalues$dfWorking$x$data <- droplevels(Yvalues$dfWorking$x$data)
       Ys_df <<- Yvalues$dfWorking$x$data[,-1]
       for (k in 1:length(All_XData)){
         All_XData[[k]] <<- All_XData[[k]][-(1+lesRows),]
