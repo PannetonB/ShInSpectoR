@@ -291,7 +291,7 @@ shinyServer(function(input, output, session) {
      ## Loads data ----
     observeEvent(input$files, {
         k=1
-        inFile <- input$files
+        inFile <<- input$files
         if (is.null(inFile))
           return(NULL)
         
@@ -2007,6 +2007,7 @@ shinyServer(function(input, output, session) {
     })
     
     
+    
     #*******************************************************************
     ## Reacts to plot PLSDA Prob. boxplot ----
     
@@ -2020,7 +2021,9 @@ shinyServer(function(input, output, session) {
       input$PLSDATrainTestBut
       if (whichPLSDAPlot=="ProBoxplot"){
         isolate({
-    
+          
+          cat("Here boxplots\n")
+            
           if (input$PLSDATrainTestBut == "Validation"){
             pred_prob <- Predict_plsda(input$AggregOpForPLSDA, plsdaFit,probs=TRUE)
             dum1<-data.frame(cl=plsdaFit[[1]]$trainingData[,1],pred_prob)
@@ -2043,13 +2046,14 @@ shinyServer(function(input, output, session) {
                 ggplot2::theme(axis.text.x = element_text(angle=60, hjust=1, vjust=1))
             )
           })
+         
         })
       }
     })
     
     
     #*******************************************************************
-    ## Reacts to plot PLSDA B-Coeff ----
+        ## Reacts to plot PLSDA B-Coeff ----
     
     observeEvent(input$PLSDABCoeffPlot,
                  whichPLSDAPlot <<- "BCoeffs"
@@ -2219,6 +2223,74 @@ shinyServer(function(input, output, session) {
     
     # *********************************************************************
     
+    ## Plot Prob biplots in a modal window ----
+    observeEvent(input$PLSDAProbBiPlot,{
+      
+      isolate({
+        
+        cat("Here biplots\n")
+        
+        if (input$PLSDATrainTestBut == "Validation"){
+          pred_prob <- Predict_plsda(input$AggregOpForPLSDA, plsdaFit,probs=TRUE)
+          dum1<-data.frame(pred_prob,Class=plsdaFit[[1]]$trainingData[,1])
+          
+        }else
+        {
+          testing <- lapply (plsda_set, function(x) x[-plsda_inTrain,])
+          pred_prob <- Predict_plsda(input$AggregOpForPLSDA, plsdaFit,testing,probs=TRUE)
+          dum1<-data.frame(pred_prob,Class=testing[[1]][,1])
+          
+        }
+        
+        nCl <- nlevels(dum1$Class)
+        lesPlots <- vector(mode = "list", length = (nCl-1)^2)
+        
+        
+        
+        for (i in 1:(nCl-1)){
+          for (j in (2:nCl)){
+            k=(j-2)*(nCl-1)+i
+            if (j>i){
+              
+              xCol <- colnames(dum1)[i]
+              yCol <- colnames(dum1)[j]
+              lesPlots[[k]] <- ggplot(dum1, aes(.data[[xCol]], .data[[yCol]], shape=Class)) +
+                geom_point(size=1.5, show.legend = FALSE) +
+                scale_shape_manual(values=c(0:3,15:19)) +
+                stat_ellipse(level=0.95)
+              if (k>1) lesPlots[[k]] <- lesPlots[[k]] +
+                theme(legend.position="none")
+            }else
+            {
+              if (k==(nCl-1)){
+                xCol <- colnames(dum1)[1]
+                yCol <- colnames(dum1)[2]
+                unPlot <- ggplot(dum1, aes(.data[[xCol]], .data[[yCol]], shape=Class)) +
+                  geom_point(size=1.5) +
+                  scale_shape_manual(values=c(0:3,15:19)) +
+                  stat_ellipse(level=0.95) 
+                legend <- cowplot::get_legend(unPlot)
+                
+                lesPlots[[k]] <- cowplot::ggdraw(legend)
+              }else
+              {
+                lesPlots[[k]] <- cowplot::ggdraw()
+              }
+              
+            }
+          }
+        }
+        # m1 <- arrangeGrob(grobs=lesPlots,nrow=nCl-1,ncol=nCl-1,top=NULL)
+        
+        output$plsdaProbBiPlots <- renderPlot({
+          m1 <- arrangeGrob(grobs=lesPlots,nrow=nCl-1,ncol=nCl-1,top=NULL)
+          grid.arrange(m1)
+        })
+      })
+    })
+    
+    
+    # *********************************************************************
     # Apply tab ----
     ## Reacts to apply tab activation ----
     observeEvent(input$tabs,{

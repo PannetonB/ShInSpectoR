@@ -32,7 +32,9 @@ lesLibrairies <-
       "prospectr",
       "caret",
       "paletteer",
-      "here"
+      "here",
+      "grid",
+      "gridExtra"
   )
 
 cat("Loading libraires!")
@@ -48,7 +50,10 @@ shinyUI(fluidPage(
     tags$head(
         tags$style(HTML("hr {border-top: 1px solid #000000;}")),
         #For setting column widths,
-        tags$style(HTML("table {table-layout: fixed;}")),
+        tags$style(HTML("table {table-layout: fixed;}")), 
+        #Size of modal windows
+        tags$head(tags$style(".modal-body{ min-height:800px}")),
+        tags$style(HTML('.modal-lg {width: 1200px;}')),
         #For x scroll fix in datatable filtering
         tags$style("
               .datatables-scroll {
@@ -70,6 +75,8 @@ shinyUI(fluidPage(
             ")
         
     ),
+    
+   
 
     ## Application title ----
     fluidRow(
@@ -150,7 +157,7 @@ shinyUI(fluidPage(
                             "Loading Plots", 
                             "plotloadings", # <----set the observer to the right button
                             size = "large",
-                            plotlyOutput("loadingPlots")
+                            plotlyOutput("loadingPlots", height="800px")
                     ) 
                     
                ),
@@ -280,6 +287,8 @@ shinyUI(fluidPage(
                                            hr(),
                                            actionButton('PLSDAProbBoxPlot', strong('Prob. boxplots')),
                                            hr(),
+                                           actionButton('PLSDAProbBiPlot', strong('Prob. biplots')),
+                                           hr(),
                                            radioButtons('PLSDATrainTestBut', 'Select model type',
                                                         choices=c('Validation','Test')),
                                            hr(),
@@ -315,7 +324,13 @@ shinyUI(fluidPage(
                                     
                                     
                               )
-                            )
+                            ),
+                            bsModal("PLSDABiPlots", 
+                                    "Probability biplots", 
+                                    "PLSDAProbBiPlot", # <----set the observer to the right button
+                                    size = "large",
+                                    plotOutput("plsdaProbBiPlots", height="800px")
+                            ) 
                         ),
                
                ### PLS tab ----
