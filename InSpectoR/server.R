@@ -17,9 +17,9 @@ shinyServer(function(input, output, session) {
   
   #SET UP PROJECT PATH
   projectDir <- rstudioapi::selectDirectory(
-    caption="Select root working directory for this session.",
-
+    caption="Select root working directory for this session."
   )
+  
   # leFichier <- here("InSpectoR","www","defPath.RData")
   # load(leFichier)
 
@@ -2227,7 +2227,7 @@ shinyServer(function(input, output, session) {
     observeEvent(input$PLSDAProbBiPlot,{
       
       isolate({
-        
+        textSize <- 10
         cat("Here biplots\n")
         
         if (input$PLSDATrainTestBut == "Validation"){
@@ -2241,6 +2241,8 @@ shinyServer(function(input, output, session) {
           dum1<-data.frame(pred_prob,Class=testing[[1]][,1])
           
         }
+        splitDot<-strsplit(colnames(dum1), ".", fixed = TRUE)
+        colnames(dum1) <- lapply(splitDot, function(x) x[1])
         
         nCl <- nlevels(dum1$Class)
         lesPlots <- vector(mode = "list", length = (nCl-1)^2)
@@ -2257,7 +2259,8 @@ shinyServer(function(input, output, session) {
               lesPlots[[k]] <- ggplot(dum1, aes(.data[[xCol]], .data[[yCol]], shape=Class)) +
                 geom_point(size=1.5, show.legend = FALSE) +
                 scale_shape_manual(values=c(0:3,15:19)) +
-                stat_ellipse(level=0.95)
+                stat_ellipse(level=0.95) + 
+                theme(text=element_text(size=textSize))
               if (k>1) lesPlots[[k]] <- lesPlots[[k]] +
                 theme(legend.position="none")
             }else
@@ -2268,7 +2271,12 @@ shinyServer(function(input, output, session) {
                 unPlot <- ggplot(dum1, aes(.data[[xCol]], .data[[yCol]], shape=Class)) +
                   geom_point(size=1.5) +
                   scale_shape_manual(values=c(0:3,15:19)) +
-                  stat_ellipse(level=0.95) 
+                  stat_ellipse(level=0.95) + 
+                  theme(text=element_text(size=textSize)) +
+                  theme(legend.text = element_text(size = textSize)) +
+                  guides(shape=guide_legend(title=paste0("Class - ",
+                                                         input$PLSDATrainTestBut,
+                                                         " set")))
                 legend <- cowplot::get_legend(unPlot)
                 
                 lesPlots[[k]] <- cowplot::ggdraw(legend)
@@ -2283,12 +2291,27 @@ shinyServer(function(input, output, session) {
         # m1 <- arrangeGrob(grobs=lesPlots,nrow=nCl-1,ncol=nCl-1,top=NULL)
         
         output$plsdaProbBiPlots <- renderPlot({
-          m1 <- arrangeGrob(grobs=lesPlots,nrow=nCl-1,ncol=nCl-1,top=NULL)
-          grid.arrange(m1)
+          plot_2_save <<- arrangeGrob(grobs=lesPlots,nrow=nCl-1,ncol=nCl-1,top=NULL)
+          grid.arrange(plot_2_save)
         })
       })
     })
     
+    # *********************************************************************
+    
+    ## Save Prob biplots in modal window ----
+    observeEvent(input$savePLSDAProbBiplot,{
+    
+      #SET UP filename
+      # plotFilename <- rstudioapi::selectFile(
+      #   caption="Select file name to store plot", existing=FALSE)
+      plotFilename <- choose.files("Select file name to store plot",
+                                   multi = FALSE,
+                                   filters = Filters[c("png","jpeg","pdf"),])
+      laDevice <- tools::file_ext(plotFilename)
+      ggsave(file=plotFilename,plot=grid.arrange(plot_2_save),
+             device=laDevice)
+    })
     
     # *********************************************************************
     # Apply tab ----

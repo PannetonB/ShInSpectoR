@@ -329,7 +329,8 @@ shinyUI(fluidPage(
                                     "Probability biplots", 
                                     "PLSDAProbBiPlot", # <----set the observer to the right button
                                     size = "large",
-                                    plotOutput("plsdaProbBiPlots", height="800px")
+                                    plotOutput("plsdaProbBiPlots", height="800px"),
+                                    actionButton("savePLSDAProbBiplot","Save")
                             ) 
                         ),
                
