@@ -2227,9 +2227,8 @@ shinyServer(function(input, output, session) {
     observeEvent(input$PLSDAProbBiPlot,{
       
       isolate({
-        textSize <- 10
-        cat("Here biplots\n")
-        
+        lesSizes <- c(10,10,10,8,8,7,7,7,7,7,5,5,5,5,rep(5,10))
+       
         if (input$PLSDATrainTestBut == "Validation"){
           pred_prob <- Predict_plsda(input$AggregOpForPLSDA, plsdaFit,probs=TRUE)
           dum1<-data.frame(pred_prob,Class=plsdaFit[[1]]$trainingData[,1])
@@ -2245,6 +2244,7 @@ shinyServer(function(input, output, session) {
         colnames(dum1) <- lapply(splitDot, function(x) x[1])
         
         nCl <- nlevels(dum1$Class)
+        textSize <- lesSizes[nCl-1]
         lesPlots <- vector(mode = "list", length = (nCl-1)^2)
         
         
@@ -2268,30 +2268,31 @@ shinyServer(function(input, output, session) {
               if (k==(nCl-1)){
                 xCol <- colnames(dum1)[1]
                 yCol <- colnames(dum1)[2]
-                unPlot <- ggplot(dum1, aes(.data[[xCol]], .data[[yCol]], shape=Class)) +
+                unPlot <- ggplot(dum1, aes(.data[[xCol]], .data[[yCol]], shape=Class))  +
                   geom_point(size=1.5) +
                   scale_shape_manual(values=c(0:3,15:19)) +
                   stat_ellipse(level=0.95) + 
-                  theme(text=element_text(size=textSize)) +
-                  theme(legend.text = element_text(size = textSize)) +
+                  theme(text=element_text(size=round(textSize*1.5)))  +
                   guides(shape=guide_legend(title=paste0("Class - ",
                                                          input$PLSDATrainTestBut,
                                                          " set")))
-                legend <- cowplot::get_legend(unPlot)
                 
-                lesPlots[[k]] <- cowplot::ggdraw(legend)
-              }else
-              {
-                lesPlots[[k]] <- cowplot::ggdraw()
+                legend <- cowplot::get_legend(unPlot)
               }
-              
+              lesPlots[[k]] <- cowplot::ggdraw()
             }
           }
         }
-        # m1 <- arrangeGrob(grobs=lesPlots,nrow=nCl-1,ncol=nCl-1,top=NULL)
         
         output$plsdaProbBiPlots <- renderPlot({
-          plot_2_save <<- arrangeGrob(grobs=lesPlots,nrow=nCl-1,ncol=nCl-1,top=NULL)
+          m1 <- arrangeGrob(grobs=lesPlots,nrow=nCl-1,ncol=nCl-1,top=NULL)
+          if(nCl>3){
+            lesWidths <- c(0.8,0.2)
+          }else
+          {
+            lesWidths <- c(0.7,0.3)
+          }
+          plot_2_save <<- arrangeGrob(m1,cowplot::ggdraw(legend),ncol=2,widths=lesWidths)
           grid.arrange(plot_2_save)
         })
       })
