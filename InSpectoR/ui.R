@@ -326,7 +326,7 @@ shinyUI(fluidPage(
                               )
                             ),
                             bsModal("PLSDABiPlots", 
-                                    "Probability biplots", 
+                                    "Probability biplots - wait for refresh!", 
                                     "PLSDAProbBiPlot", # <----set the observer to the right button
                                     size = "large",
                                     plotOutput("plsdaProbBiPlots", height="800px"),
