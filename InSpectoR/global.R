@@ -316,7 +316,7 @@ computePCAsDT <- function(nCP,dum, leNom)
 
 #***********************************************************************
 
-computePCAonRaw <- function(nCP, doRayleigh=FALSE)
+computePCAonRaw <- function(nCP, doRayleigh=FALSE,isFirst=FALSE)
 #Compute PCA on all elements of All_XData performing
 # truncation of Rayleigh for fluo and normalisation by
 # closure for all. This generates PCAsDT (PCA for data tab)  
@@ -333,11 +333,12 @@ computePCAonRaw <- function(nCP, doRayleigh=FALSE)
     # Check if this is fluorescence
     isFluo <- substr(leNom,1,2)=="EX"
     if (isFluo){
+      #Find excitation wavelength
+      EXwv <- strsplit(leNom,"_")[[1]][1]
+      #ATTN - marche si longueur d'onde d'excitation a 3 chiffres.
+      EXwv <- as.numeric(substr(EXwv,start=3,stop=5))
+      
       if (doRayleigh){
-        #Find excitation wavelength
-        EXwv <- strsplit(leNom,"_")[[1]][1]
-        #ATTN - marche si longueur d'onde d'excitation a 3 chiffres.
-        EXwv <- as.numeric(substr(EXwv,start=3,stop=5))
         
         #Find local min between EXwv and EXwv+50
         #First do some smoothing
@@ -361,6 +362,7 @@ computePCAonRaw <- function(nCP, doRayleigh=FALSE)
         RayleighCutoffs[[leNom]] <<- wvDip
       }else
       {
+        if (isFirst) RayleighCutoffs[[leNom]] <<- EXwv+20
         wvDip <- RayleighCutoffs[[leNom]]
       }
       

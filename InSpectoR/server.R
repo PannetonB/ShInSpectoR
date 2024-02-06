@@ -407,7 +407,8 @@ shinyServer(function(input, output, session) {
                           selected=2)
         
         lesChoix <- computePCAonRaw(as.numeric(input$npcs),
-                                    doRayleigh = TRUE)
+                                    doRayleigh = input$doRayleigh,
+                                    isFirst=TRUE)
         
         #Populate Xs file selection and select first by default
         updateSelectInput(session, "Xs",               
@@ -558,7 +559,7 @@ shinyServer(function(input, output, session) {
                                            lowWL,hiWL,1),
                               numericInput(paste0(id,"_C"), 'Bandwidth', 1,1,25,2),
                               checkboxInput(paste0(id,"_D"), strong('SAVITSKY-GOLAY'), FALSE, width='20px'),
-                              numericInput(paste0(id,'_E'), 'Bandwidth',5,5,25,2),
+                              numericInput(paste0(id,'_E'), 'Bandwidth (odd number only!',5,5,105,2),
                               numericInput(paste0(id,'_F'), 'Polynomial order',3,1,10,1),
                               numericInput(paste0(id,'_G'), 'Derivative order',0,0,2,1)
                               

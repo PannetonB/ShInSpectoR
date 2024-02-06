@@ -96,7 +96,8 @@ shinyUI(fluidPage(
                                       buttonLabel = "Fichier Y",
                                       accept = c(".txt"),
                                       multiple=F),
-                            
+                            checkboxInput("doRayleigh","Auto Rayleigh cutoff",
+                                          value=TRUE),
                             h4("Y data file name: "),
                             textOutput("yFileName"),
                             hr(),
