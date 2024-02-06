@@ -340,6 +340,7 @@ shinyServer(function(input, output, session) {
                 test1 <- length(dum1[-1,1])==length(Ys_df[,1])
                 test2 <- TRUE
                 if (test1) test2 <- any(as.character(dum1[-1,1])!=as.character(Ys_df[,1]))
+               
                 if (test2){ 
                     showModal(modalDialog(       #Not matching
                         title="WARNING", 
