@@ -2024,8 +2024,7 @@ shinyServer(function(input, output, session) {
       if (whichPLSDAPlot=="ProBoxplot"){
         isolate({
           
-          cat("Here boxplots\n")
-            
+          
           if (input$PLSDATrainTestBut == "Validation"){
             pred_prob <- Predict_plsda(input$AggregOpForPLSDA, plsdaFit,probs=TRUE)
             dum1<-data.frame(cl=plsdaFit[[1]]$trainingData[,1],pred_prob)
@@ -2572,7 +2571,6 @@ shinyServer(function(input, output, session) {
                    
                    #Do preprocessing
                    Apply_PrePro(locPP_params,input)
-                   cat("\nDone PrePro\n")
                    
                    lesNoms <- names(XData_p)
                    lesFacs <- input$factorsToShow
@@ -2603,14 +2601,11 @@ shinyServer(function(input, output, session) {
                      pls_set <<- y
                      
                      
-                     cat("\nDone assembling pls_set/n")
-                     
                      plspreds<-predict(modelEnv$plsFit[[1]],
                                        newdata = pls_set,
                                        ncomp=modelEnv$pls_ncomp)
                      
                      lesPreds <<-data.frame(Prediction=plspreds)
-                     cat("\nDone computing pls/n")
                      output$modelTable = renderDataTable(cbind(Ys_df[lesFacs],
                                                                Prediction=lesPreds),
                                                          options=list(
@@ -2629,8 +2624,7 @@ shinyServer(function(input, output, session) {
                                                              #columnDefs = list(list(orderable = TRUE, targets = 0)
                                                            )
                                                          ),filter='top')
-                     cat("\nDone rendering table\n")
-                     cat("\nLength of XData_p: ",length(XData_p),"\n")
+                     
                      
                    
                      },

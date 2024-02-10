@@ -217,7 +217,6 @@ Apply_PrePro <- function(preproParams,input)
   #In preproParams, lesNoms give active spectrum types
 {
   lesNoms <- preproParams$lesNoms
-  cat("\nIn Apply_PrePro - ",input$tabs)
   #usePDS----
   if (input$tabs=="Apply models" & input$usePDS){ #Apply PDS
     #First get transfer matrices
@@ -228,7 +227,6 @@ Apply_PrePro <- function(preproParams,input)
     names(lesFichiers) <- lesNoms
     #Load PDS matrices
     #Do correction
-    cat("\ndoPDS\n")
     XData_p <<- list()
     for (leNom in lesNoms){
       pEnv <- new.env()
@@ -241,7 +239,6 @@ Apply_PrePro <- function(preproParams,input)
       XData_p[[leNom]] <<- dumOut
     }
     rm(pEnv)
-    cat("\nDone PDS - length(XData_p):",length(XData_p),"\n")
   }else
   {
     XData_p <<- list()

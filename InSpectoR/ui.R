@@ -437,10 +437,6 @@ shinyUI(fluidPage(
                                          hr(),
                                          h3('APPLY MODELS'),
                                          hr(),
-                                         checkboxInput("usePDS",
-                                                       strong("Load PDS transfer matrix")
-                                                       ),
-                                         hr(),
                                          shinyFilesButton("FLoadModel",strong("Load model"),
                                                           "Select a model file",
                                                           multiple = F,
@@ -482,6 +478,9 @@ shinyUI(fluidPage(
                                          selectInput("factorsToShow","Factor for table output",
                                                      choice=NULL,
                                                      multiple=T),
+                                         checkboxInput("usePDS",
+                                                       strong("Load PDS transfer matrix")
+                                         ),
                                          actionButton("applyModel",strong("Apply")),
                                          shinySaveButton("saveModelResults", strong("Save results"),
                                                          "Define file name", 
