@@ -222,7 +222,8 @@ Apply_PrePro <- function(preproParams,input)
     #First get transfer matrices
     EXwv <- lapply(lesNoms,function(nom) strsplit(nom,"w")[[1]][1])
     lesFichiers <<- lapply(EXwv,function(nom){
-      choose.files(default=paste0(projectDir,"\\",nom,"*.RData"))
+      choose.files(default=paste0(projectDir,"\\",nom,"*.RData"),
+                   caption=paste("Select PDS transfer file for",nom))
     })
     names(lesFichiers) <- lesNoms
     #Load PDS matrices
