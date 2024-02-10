@@ -16,7 +16,7 @@ shinyServer(function(input, output, session) {
 
   
   #SET UP PROJECT PATH
-  projectDir <- rstudioapi::selectDirectory(
+  projectDir <<- rstudioapi::selectDirectory(
     caption="Select root working directory for this session."
   )
   
@@ -82,7 +82,7 @@ shinyServer(function(input, output, session) {
         
         #In case user did not apply prepros
         preproParams <- collectPreProParams(PPvaluesTrunc,input)
-        Apply_PrePro(preproParams)
+        Apply_PrePro(preproParams,input)
         lesChoix <- computePCAonRaw(as.numeric(input$npcs),doRayleigh = FALSE)
         
         #Force redraw
@@ -583,7 +583,7 @@ shinyServer(function(input, output, session) {
           
           #Apply default prepro
           preproParams <- collectPreProParams(PPvaluesTrunc,dummyInput)
-          Apply_PrePro(preproParams)
+          Apply_PrePro(preproParams,input)
           lesChoix <- computePCAonRaw(as.numeric(input$npcs),doRayleigh = FALSE)
 
           
@@ -910,7 +910,7 @@ shinyServer(function(input, output, session) {
     observeEvent(input$applyPrePro,{
       s <- unique(input$Ys_rows_selected)
       preproParams <- collectPreProParams(PPvaluesTrunc,input)
-      Apply_PrePro(preproParams)
+      Apply_PrePro(preproParams,input)
       #Force redraw
       proxy_Ys %>% selectRows(NULL)
       proxy_Ys %>% selectRows(s)
@@ -1062,7 +1062,7 @@ shinyServer(function(input, output, session) {
           #Perform pre-processing so XData_p is inline with prepro options
           #Useful in case user did not Apply prepros
           preproParams <- collectPreProParams(PPvaluesTrunc,input)
-          Apply_PrePro(preproParams)
+          Apply_PrePro(preproParams,input)
           
           })
         output$PLSPlotID <-   renderText("PLOT TYPE ID")
@@ -1450,7 +1450,7 @@ shinyServer(function(input, output, session) {
           #Perform pre-processing so XData_p is inline with prepro options
           #Useful in case user did not Apply prepros
           preproParams <- collectPreProParams(PPvaluesTrunc,input)
-          Apply_PrePro(preproParams)
+          Apply_PrePro(preproParams,input)
           
           #Computes PCA on first spectrum in input$X to start with
           dum <- XData_p[[input$Xs[1]]]
@@ -1710,7 +1710,7 @@ shinyServer(function(input, output, session) {
           #Perform pre-processing so XData_p is inline with prepro options
           #Useful in case user did not Apply prepros
           preproParams <- collectPreProParams(PPvaluesTrunc,input)
-          Apply_PrePro(preproParams)
+          Apply_PrePro(preproParams,input)
         })
       }
     
@@ -2410,7 +2410,7 @@ shinyServer(function(input, output, session) {
                       locPP_params <- buildPreProNames(modelEnv$PP_params)
                       
                       #Do preprocessing
-                      Apply_PrePro(locPP_params)
+                      Apply_PrePro(locPP_params,input)
                       lesNoms <- names(XData_p)
                       
                       #Apply model
@@ -2571,7 +2571,9 @@ shinyServer(function(input, output, session) {
                    locPP_params <- buildPreProNames(modelEnv$PP_params)
                    
                    #Do preprocessing
-                   Apply_PrePro(locPP_params)
+                   Apply_PrePro(locPP_params,input)
+                   cat("\nDone PrePro\n")
+                   
                    lesNoms <- names(XData_p)
                    lesFacs <- input$factorsToShow
                    y <- NULL
@@ -2600,11 +2602,15 @@ shinyServer(function(input, output, session) {
                      
                      pls_set <<- y
                      
+                     
+                     cat("\nDone assembling pls_set/n")
+                     
                      plspreds<-predict(modelEnv$plsFit[[1]],
                                        newdata = pls_set,
                                        ncomp=modelEnv$pls_ncomp)
                      
                      lesPreds <<-data.frame(Prediction=plspreds)
+                     cat("\nDone computing pls/n")
                      output$modelTable = renderDataTable(cbind(Ys_df[lesFacs],
                                                                Prediction=lesPreds),
                                                          options=list(
@@ -2623,7 +2629,8 @@ shinyServer(function(input, output, session) {
                                                              #columnDefs = list(list(orderable = TRUE, targets = 0)
                                                            )
                                                          ),filter='top')
-                     
+                     cat("\nDone rendering table\n")
+                     cat("\nLength of XData_p: ",length(XData_p),"\n")
                      
                    
                      },
@@ -2633,7 +2640,7 @@ shinyServer(function(input, output, session) {
                        locPP_params <- buildPreProNames(modelEnv$PP_params)
                        
                        #Do preprocessing
-                       Apply_PrePro(locPP_params)
+                       Apply_PrePro(locPP_params,input)
                        lesNoms <- names(XData_p)
                        lesFacs <- input$factorsToShow
                        y <- NULL

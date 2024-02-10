@@ -212,20 +212,53 @@ prepro_Shin_2_InSp <- function(PP_params)
 
 #***********************************************************************
 
-Apply_PrePro <- function(preproParams)
+Apply_PrePro <- function(preproParams,input)
   #Apply all preprocessing as defined in the prepro tab.
   #In preproParams, lesNoms give active spectrum types
 {
-  #Truncation-----
-  # cat("In Apply_Prepro\n")
-  
-  trunc_limits <- preproParams$trunc_limits
   lesNoms <- preproParams$lesNoms
-  XData_p <<- list()
+  cat("\nIn Apply_PrePro - ",input$tabs)
+  #usePDS----
+  if (input$tabs=="Apply models" & input$usePDS){ #Apply PDS
+    #First get transfer matrices
+    EXwv <- lapply(lesNoms,function(nom) strsplit(nom,"w")[[1]][1])
+    lesFichiers <<- lapply(EXwv,function(nom){
+      choose.files(default=paste0(projectDir,"\\",nom,"*.RData"))
+    })
+    names(lesFichiers) <- lesNoms
+    #Load PDS matrices
+    #Do correction
+    cat("\ndoPDS\n")
+    XData_p <<- list()
+    for (leNom in lesNoms){
+      pEnv <- new.env()
+      load(lesFichiers[[leNom]],pEnv)
+      dum <- All_XData[[leNom]][-1,-1]
+      slaveX_c <- as.matrix(dum) %*% as.matrix(pEnv$P$P)
+      slaveX_c <- sweep(slaveX_c, 2, as.numeric(t(pEnv$P$Intercept)), "+")
+      dumOut <- All_XData[[leNom]]
+      dumOut[-1,-1] <- slaveX_c
+      XData_p[[leNom]] <<- dumOut
+    }
+    rm(pEnv)
+    cat("\nDone PDS - length(XData_p):",length(XData_p),"\n")
+  }else
+  {
+    XData_p <<- list()
+    lapply(lesNoms,function(leNom){
+      XData_p[[leNom]] <<- All_XData[[leNom]]
+    })
+   
+  }
+  
+  #Truncation-----
+  trunc_limits <- preproParams$trunc_limits
+  
+  # XData_p <<- list()
   
   lapply(lesNoms,function(leNom){
     wl<-All_XData[[leNom]][1,-1]
-    XData_p[[leNom]] <<- All_XData[[leNom]][,c(TRUE,
+    XData_p[[leNom]] <<- XData_p[[leNom]][,c(TRUE,
                                                    ((wl>=trunc_limits[leNom,1]) & (wl<=trunc_limits[leNom,2])))]
   }) 
   

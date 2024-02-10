@@ -437,6 +437,10 @@ shinyUI(fluidPage(
                                          hr(),
                                          h3('APPLY MODELS'),
                                          hr(),
+                                         checkboxInput("usePDS",
+                                                       strong("Load PDS transfer matrix")
+                                                       ),
+                                         hr(),
                                          shinyFilesButton("FLoadModel",strong("Load model"),
                                                           "Select a model file",
                                                           multiple = F,
